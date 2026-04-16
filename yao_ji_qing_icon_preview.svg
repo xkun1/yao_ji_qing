@@ -1,0 +1,28 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background with rounded corners (App Icon shape) -->
+  <rect width="1024" height="1024" rx="224" fill="white"/>
+  
+  <!-- Pill Shape Group -->
+  <g transform="translate(256, 312)">
+    <!-- Bottom Half of the Pill (Blue) -->
+    <path d="M0 200 C0 89.543 89.543 0 200 0 L312 0 C422.457 0 512 89.543 512 200 L512 200 C512 310.457 422.457 400 312 400 L200 400 C89.543 400 0 310.457 0 200 Z" fill="#3B82F6" opacity="0.1"/>
+    
+    <!-- Left Half (Blue) -->
+    <path d="M0 200 C0 89.543 89.543 0 200 0 L256 0 L256 400 L200 400 C89.543 400 0 310.457 0 200 Z" fill="#3B82F6"/>
+    
+    <!-- Right Half (Green) -->
+    <path d="M256 0 L312 0 C422.457 0 512 89.543 512 200 L512 200 C512 310.457 422.457 400 312 400 L256 400 L256 0 Z" fill="#10B981"/>
+    
+    <!-- Central AI Eye Element -->
+    <circle cx="256" cy="200" r="90" fill="white" stroke="#3B82F6" stroke-width="20"/>
+    <circle cx="256" cy="200" r="45" fill="#3B82F6"/>
+    <!-- Small reflection dot for the "eye" -->
+    <circle cx="270" cy="186" r="12" fill="white" opacity="0.8"/>
+    
+    <!-- Subtle Scanning Line across the eye -->
+    <rect x="180" y="195" width="152" height="10" rx="5" fill="white" opacity="0.4"/>
+  </g>
+  
+  <!-- Slogan (Optional, for visual only) -->
+  <!-- <text x="512" y="850" font-family="Arial" font-size="80" font-weight="bold" fill="#3B82F6" text-anchor="middle">药记清</text> -->
+</svg>

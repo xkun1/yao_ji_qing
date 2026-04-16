@@ -1,0 +1,30 @@
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.buildDir = '../build'
+subprojects {
+    project.buildDir = "${rootProject.buildDir}/${project.name}"
+}
+subprojects {
+    project.evaluationDependsOn(':app')
+}
+subprojects { subproject ->
+    subproject.plugins.withId("com.android.library") {
+        def androidExtension = subproject.extensions.findByName("android")
+        if (androidExtension != null && !androidExtension.namespace) {
+            def fallbackNamespace = subproject.group?.toString()
+            if (!fallbackNamespace || fallbackNamespace == "unspecified") {
+                fallbackNamespace = "com.kunge.yaojiqing.plugins.${subproject.name}"
+            }
+            androidExtension.namespace = fallbackNamespace.replaceAll("-", "_")
+        }
+    }
+}
+
+tasks.register("clean", Delete) {
+    delete rootProject.layout.buildDirectory
+}
