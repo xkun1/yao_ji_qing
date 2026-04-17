@@ -6,6 +6,8 @@ class MedicationTaskCard extends StatelessWidget {
   final VoidCallback onMarkTaken;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final GlobalKey? editKey;
+  final GlobalKey? deleteKey;
 
   const MedicationTaskCard({
     super.key,
@@ -13,6 +15,8 @@ class MedicationTaskCard extends StatelessWidget {
     required this.onMarkTaken,
     required this.onEdit,
     required this.onDelete,
+    this.editKey,
+    this.deleteKey,
   });
 
   @override
@@ -121,10 +125,12 @@ class MedicationTaskCard extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         IconButton(
+          key: editKey,
           icon: const Icon(Icons.edit_note_rounded, color: Color(0xFF9CA3AF), size: 22),
           onPressed: onEdit,
         ),
         IconButton(
+          key: deleteKey,
           icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFFCA5A5), size: 22),
           onPressed: onDelete,
         ),

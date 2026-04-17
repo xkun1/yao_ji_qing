@@ -28,24 +28,6 @@ class ReminderTime {
   final int minute;
 }
 
-class DemoMedication {
-  const DemoMedication({
-    required this.name,
-    required this.dosage,
-    required this.frequency,
-    required this.note,
-    required this.hour,
-    required this.minute,
-  });
-
-  final String name;
-  final String dosage;
-  final String frequency;
-  final String note;
-  final int hour;
-  final int minute;
-}
-
 class DatabaseService {
   static final DatabaseService _instance = DatabaseService._internal();
   factory DatabaseService() => _instance;
@@ -62,8 +44,6 @@ class DatabaseService {
       [MedicineSchema, ReminderSchema, IntakeLogSchema],
       directory: dir.path,
     );
-    await _removeLegacySeedData();
-    await _ensureDemoMedicines();
     await rescheduleAllActiveReminders();
   }
 
@@ -150,92 +130,6 @@ class DatabaseService {
           minute: reminder.minute,
         );
       }
-    }
-  }
-
-  Future<void> _removeLegacySeedData() async {
-    final demoMedicine = await isar.medicines
-        .filter()
-        .nameEqualTo('阿莫西林胶囊')
-        .dosageEqualTo('2粒')
-        .frequencyEqualTo('3')
-        .noteEqualTo('饭后吃，忌酒')
-        .findFirst();
-
-    if (demoMedicine == null) return;
-
-    await demoMedicine.reminders.load();
-    final reminderTimes = demoMedicine.reminders
-        .map((reminder) => '${reminder.hour}:${reminder.minute}')
-        .toList()
-      ..sort();
-
-    if (reminderTimes.join(',') != '12:30,18:30,8:30') return;
-
-    final reminderIds = demoMedicine.reminders.map((reminder) => reminder.id).toList();
-    await isar.writeTxn(() async {
-      await isar.medicines.delete(demoMedicine.id);
-      await isar.reminders.deleteAll(reminderIds);
-    });
-  }
-
-  Future<void> _ensureDemoMedicines() async {
-    // [核心改进] 如果数据库里已经有药了，不管是什么药，都不要再自动生成演示数据了
-    final count = await isar.medicines.count();
-    if (count > 0) return;
-
-    const demoItems = [
-      DemoMedication(
-        name: '维生素D滴剂',
-        dosage: '1粒',
-        frequency: '1',
-        note: '早餐后服用',
-        hour: 8,
-        minute: 30,
-      ),
-      DemoMedication(
-        name: '鱼油软胶囊',
-        dosage: '2粒',
-        frequency: '1',
-        note: '午餐后服用',
-        hour: 12,
-        minute: 30,
-      ),
-      DemoMedication(
-        name: '钙片',
-        dosage: '1片',
-        frequency: '1',
-        note: '晚餐后服用',
-        hour: 19,
-        minute: 30,
-      ),
-    ];
-
-    for (final item in demoItems) {
-      final existing = await isar.medicines
-          .filter()
-          .nameEqualTo(item.name)
-          .noteEqualTo(item.note)
-          .findFirst();
-      if (existing != null) continue;
-
-      final medicine = Medicine()
-        ..name = item.name
-        ..dosage = item.dosage
-        ..frequency = item.frequency
-        ..instruction = '演示数据'
-        ..note = item.note;
-
-      final reminder = Reminder()
-        ..hour = item.hour
-        ..minute = item.minute;
-
-      await isar.writeTxn(() async {
-        await isar.medicines.put(medicine);
-        await isar.reminders.put(reminder);
-        medicine.reminders.add(reminder);
-        await medicine.reminders.save();
-      });
     }
   }
 

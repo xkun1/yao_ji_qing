@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace "com.kunge.yaojiqing"
-    compileSdkVersion flutter.compileSdkVersion
+    compileSdkVersion 36
     ndkVersion "28.2.13676358"
 
     compileOptions {
@@ -23,16 +23,28 @@ android {
         main.java.srcDirs += 'src/main/kotlin'
     }
 
+    packaging {
+        jniLibs {
+            excludes += ["lib/x86_64/**", "lib/armeabi-v7a/**"]
+        }
+    }
+
     defaultConfig {
         applicationId "com.kunge.yaojiqing"
         minSdkVersion flutter.minSdkVersion
-        targetSdkVersion flutter.targetSdkVersion
+        targetSdkVersion 36
         versionCode flutter.versionCode
         versionName flutter.versionName
+        ndk {
+            abiFilters "arm64-v8a"
+        }
     }
 
     buildTypes {
         release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.debug
         }
     }
@@ -43,5 +55,8 @@ flutter {
 }
 
 dependencies {
-    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:1.2.2"
+    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.0.4"
+    implementation "androidx.core:core:1.13.1"
+    implementation "androidx.core:core-ktx:1.13.1"
+    implementation "androidx.appcompat:appcompat:1.6.1"
 }

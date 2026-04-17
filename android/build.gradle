@@ -12,15 +12,40 @@ subprojects {
 subprojects {
     project.evaluationDependsOn(':app')
 }
-subprojects { subproject ->
+
+// 解决 androidx.core 版本不一致导致的 lStar 错误
+subprojects {
+    project.configurations.all {
+        resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == 'androidx.core' && details.requested.name == 'core') {
+                details.useVersion '1.13.1'
+            }
+        }
+    }
+}
+
+def configureAndroidLibrary = { subproject ->
     subproject.plugins.withId("com.android.library") {
         def androidExtension = subproject.extensions.findByName("android")
-        if (androidExtension != null && !androidExtension.namespace) {
-            def fallbackNamespace = subproject.group?.toString()
-            if (!fallbackNamespace || fallbackNamespace == "unspecified") {
-                fallbackNamespace = "com.kunge.yaojiqing.plugins.${subproject.name}"
+        if (androidExtension != null) {
+            androidExtension.compileSdkVersion 36
+            if (!androidExtension.namespace) {
+                def fallbackNamespace = subproject.group?.toString()
+                if (!fallbackNamespace || fallbackNamespace == "unspecified") {
+                    fallbackNamespace = "com.kunge.yaojiqing.plugins.${subproject.name}"
+                }
+                androidExtension.namespace = fallbackNamespace.replaceAll("-", "_")
             }
-            androidExtension.namespace = fallbackNamespace.replaceAll("-", "_")
+        }
+    }
+}
+
+subprojects { subproject ->
+    if (subproject.state.executed) {
+        configureAndroidLibrary(subproject)
+    } else {
+        subproject.afterEvaluate {
+            configureAndroidLibrary(subproject)
         }
     }
 }

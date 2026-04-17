@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yao_ji_qing/views/settings_screen.dart';
 import 'package:yao_ji_qing/views/stats_screen.dart';
 import '../models/medicine.dart';
@@ -12,6 +13,7 @@ import 'ai_chat_screen.dart';
 import '../widgets/manual_medication_sheet.dart';
 import '../widgets/firework_painter.dart';
 import '../widgets/medication_task_card.dart';
+import '../widgets/feature_guide_overlay.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,11 +22,19 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen>
-    with TickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final DatabaseService _dbService = DatabaseService();
   final NotificationService _notifService = NotificationService();
   final ImagePicker _picker = ImagePicker();
+
+  // 定位锚点
+  final GlobalKey _settingsKey = GlobalKey();
+  final GlobalKey _progressKey = GlobalKey();
+  final GlobalKey _fabKey = GlobalKey();
+  final GlobalKey _statsKey = GlobalKey();
+  final GlobalKey _firstTaskKey = GlobalKey();
+  final GlobalKey _editKey = GlobalKey();
+  final GlobalKey _deleteKey = GlobalKey();
 
   static const List<String> _quotes = [
     "药到病除，心宽体健。☀️",
@@ -41,11 +51,12 @@ class _HomeScreenState extends State<HomeScreen>
 
   late String _currentQuote;
   List<TodayMedicationTask> _tasks = [];
+  TodayMedicationTask? _guideTask;
+  bool _isGuiding = false;
   late final List<FireworkParticle> _fireworkParticles;
   bool _isLoading = true;
   int _currentIndex = 0;
 
-  // 动效核心控制器
   late AnimationController _animationController;
   late AnimationController _celebrationController;
   OverlayEntry? _celebrationOverlay;
@@ -58,10 +69,9 @@ class _HomeScreenState extends State<HomeScreen>
     _currentQuote = _quotes[math.Random().nextInt(_quotes.length)];
     _initData();
     
-    // 坤哥，总时长 500ms，为三个按钮留出充足的表演时间
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 450),
       reverseDuration: const Duration(milliseconds: 400),
     );
 
@@ -71,8 +81,44 @@ class _HomeScreenState extends State<HomeScreen>
     );
     _fireworkParticles = _buildFireworkParticles();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      SetupGuideScreen.checkAndShow(context);
+    // 启动引导逻辑
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await SetupGuideScreen.checkAndShow(context);
+      
+      final prefs = await SharedPreferences.getInstance();
+      final bool needGuide = !(prefs.getBool('feature_guide_done_v5') ?? false);
+      
+      if (needGuide && mounted) {
+        setState(() {
+          _isGuiding = true;
+          _guideTask = TodayMedicationTask(
+            medicine: Medicine()..name = "示例药品" ..dosage = "1粒",
+            reminder: Reminder()..hour = 12 ..minute = 0,
+            planTime: DateTime.now().copyWith(hour: 12, minute: 0),
+            isTaken: false,
+          );
+        });
+
+        await FeatureGuideOverlay.checkAndShow(
+          context,
+          settingsKey: _settingsKey,
+          progressKey: _progressKey,
+          fabKey: _fabKey,
+          statsKey: _statsKey,
+          firstTaskKey: _firstTaskKey,
+          editKey: _editKey,
+          deleteKey: _deleteKey,
+          onFinish: () {
+            if (mounted) {
+              setState(() {
+                _isGuiding = false;
+                _guideTask = null;
+              });
+              _loadTodayTasks();
+            }
+          },
+        );
+      }
     });
   }
 
@@ -124,6 +170,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _handleEditMedication(TodayMedicationTask task) async {
+    if (_isGuiding) return; // 引导期间禁用真实编辑
     await task.medicine.reminders.load();
     if (!mounted) return;
 
@@ -139,6 +186,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _handleDeleteMedication(TodayMedicationTask task) async {
+    if (_isGuiding) return; // 引导期间禁用真实删除
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -170,6 +218,9 @@ class _HomeScreenState extends State<HomeScreen>
     if (!mounted) return;
     setState(() {
       _tasks = tasks;
+      if (_isGuiding && _guideTask != null) {
+        _tasks = [_guideTask!, ...tasks];
+      }
       _isLoading = false;
     });
 
@@ -293,7 +344,12 @@ class _HomeScreenState extends State<HomeScreen>
         children: [
           Expanded(child: _buildNavItem(Icons.home_rounded, 0)),
           const SizedBox(width: 80),
-          Expanded(child: _buildNavItem(Icons.bar_chart_rounded, 1)),
+          Expanded(
+            child: Container(
+              key: _statsKey,
+              child: _buildNavItem(Icons.bar_chart_rounded, 1),
+            ),
+          ),
         ],
       ),
     );
@@ -306,6 +362,7 @@ class _HomeScreenState extends State<HomeScreen>
         return Transform.rotate(
           angle: _animationController.value * math.pi / 4,
           child: FloatingActionButton(
+            key: _fabKey,
             onPressed: _toggleMenu,
             backgroundColor: const Color(0xFF3B82F6),
             shape: const CircleBorder(),
@@ -318,7 +375,8 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildArcMenuOverlay() {
-    // 坤哥注意：不论是否打开都要在 Stack 中，靠内部 Opacity 控制，这样关闭动画才能跑完
+    if (!_isMenuOpen && _animationController.value == 0) return const SizedBox.shrink();
+    
     return Positioned(
       bottom: 60,
       left: 0,
@@ -373,8 +431,6 @@ class _HomeScreenState extends State<HomeScreen>
     required VoidCallback onPressed,
   }) {
     const double distance = 110.0;
-    
-    // 打开时顺序：0, 1, 2 | 关闭时顺序：2, 1, 0 (由 reverse 自动处理间隔)
     final double start = (index / total) * 0.3;
     final double end = (start + 0.7).clamp(0.0, 1.0);
     
@@ -403,22 +459,17 @@ class _HomeScreenState extends State<HomeScreen>
                 angle: (1 - v) * 0.4,
                 child: GestureDetector(
                   onTap: onPressed,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        height: 60,
-                        width: 60,
-                        decoration: BoxDecoration(
-                          color: color,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 15, offset: const Offset(0, 8))
-                          ],
-                        ),
-                        child: Icon(icon, color: Colors.white, size: 28),
-                      ),
-                    ],
+                  child: Container(
+                    height: 60,
+                    width: 60,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 15, offset: const Offset(0, 8))
+                      ],
+                    ),
+                    child: Icon(icon, color: Colors.white, size: 28),
                   ),
                 ),
               ),
@@ -483,6 +534,7 @@ class _HomeScreenState extends State<HomeScreen>
                 _loadTodayTasks();
               },
               child: Container(
+                key: _settingsKey,
                 width: 44, height: 44,
                 decoration: const BoxDecoration(color: Color(0xFFEFF6FF), shape: BoxShape.circle),
                 child: const Icon(Icons.settings_rounded, color: Color(0xFF3B82F6), size: 24),
@@ -497,6 +549,7 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _buildProgressCard() {
     final progress = _progressValue;
     final remainingCount = _totalTaskCount - _takenTaskCount;
+    final percentLabel = '${(progress * 100).round()}%';
     final isCompleted = _isTodayCompleted;
     return SliverToBoxAdapter(
       child: Padding(
@@ -504,6 +557,7 @@ class _HomeScreenState extends State<HomeScreen>
         child: GestureDetector(
           onTap: isCompleted ? _showCompletionCelebration : null,
           child: Container(
+            key: _progressKey,
             padding: const EdgeInsets.all(28),
             decoration: BoxDecoration(
                 gradient: const LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFF2563EB)], begin: Alignment.topLeft, end: Alignment.bottomRight),
@@ -528,7 +582,7 @@ class _HomeScreenState extends State<HomeScreen>
                   alignment: Alignment.center,
                   children: [
                     SizedBox(width: 84, height: 84, child: CircularProgressIndicator(value: progress, strokeWidth: 10, strokeCap: StrokeCap.round, backgroundColor: const Color(0x33FFFFFF), valueColor: const AlwaysStoppedAnimation<Color>(Colors.white))),
-                    Text('${(progress * 100).round()}%', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text(percentLabel, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                   ],
                 )
               ],
@@ -549,6 +603,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _handleMarkTaken(TodayMedicationTask task) async {
+    if (_isGuiding) return;
     final pendingCount = _tasks.where((t) => !t.isTaken).length;
     await _dbService.markTaskTaken(task);
     await _loadTodayTasks();
@@ -580,7 +635,15 @@ class _HomeScreenState extends State<HomeScreen>
         delegate: SliverChildBuilderDelegate(
           (context, index) {
             final task = pendingTasks[index];
-            return MedicationTaskCard(task: task, onMarkTaken: () => _handleMarkTaken(task), onEdit: () => _handleEditMedication(task), onDelete: () => _handleDeleteMedication(task));
+            return MedicationTaskCard(
+              key: index == 0 ? _firstTaskKey : null,
+              editKey: index == 0 ? _editKey : null,
+              deleteKey: index == 0 ? _deleteKey : null,
+              task: task,
+              onMarkTaken: () => _handleMarkTaken(task),
+              onEdit: () => _handleEditMedication(task),
+              onDelete: () => _handleDeleteMedication(task),
+            );
           },
           childCount: pendingTasks.length,
         ),
