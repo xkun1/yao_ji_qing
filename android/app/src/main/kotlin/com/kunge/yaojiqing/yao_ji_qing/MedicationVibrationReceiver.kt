@@ -1,4 +1,4 @@
-package com.kunge.yaojiqing.yao_ji_qing
+package com.kunge.yaojiqing
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -14,6 +14,11 @@ class MedicationVibrationReceiver : BroadcastReceiver() {
             // 申请 5 秒钟的唤醒锁，确保马达启动成功
             wakeLock.acquire(5000L)
             
+            if (intent.action == "com.kunge.yaojiqing.RESTART_SERVICE") {
+                MedicationForegroundService.start(context)
+                return
+            }
+
             if (MedicationVibrationScheduler.isStopAction(intent)) {
                 MedicationVibrationScheduler.handleStopTriggered(context, intent)
             } else {

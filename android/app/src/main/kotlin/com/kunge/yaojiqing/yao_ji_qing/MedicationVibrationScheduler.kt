@@ -1,4 +1,4 @@
-package com.kunge.yaojiqing.yao_ji_qing
+package com.kunge.yaojiqing
 
 import android.app.AlarmManager
 import android.app.PendingIntent
@@ -11,8 +11,8 @@ import android.os.VibratorManager
 import java.util.Calendar
 
 object MedicationVibrationScheduler {
-    private const val ACTION_VIBRATE = "com.kunge.yaojiqing.yao_ji_qing.MEDICATION_VIBRATE"
-    private const val ACTION_STOP_VIBRATION = "com.kunge.yaojiqing.yao_ji_qing.STOP_MEDICATION_VIBRATION"
+    private const val ACTION_VIBRATE = "com.kunge.yaojiqing.MEDICATION_VIBRATE"
+    private const val ACTION_STOP_VIBRATION = "com.kunge.yaojiqing.STOP_MEDICATION_VIBRATION"
     private const val PREFS_NAME = "medication_vibration_reminders"
     private const val ACTIVE_PREFS_NAME = "active_medication_vibration"
     private const val ACTIVE_ID_KEY = "active_id"
@@ -81,10 +81,17 @@ object MedicationVibrationScheduler {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val data = prefs.getString("$PREF_KEY_PREFIX$id", null)
             val parts = data?.split("|||")
-            val title = parts?.getOrNull(0) ?: "用药提醒"
-            val body = parts?.getOrNull(1) ?: "坤哥，该吃药了！"
             
-            startActiveVibration(context, id, title, body)
+            val title = parts?.getOrNull(0) ?: "用药提醒"
+            val body = parts?.getOrNull(1) ?: "您好，该吃药了！"
+            
+            val timeStr = if (hour >= 0 && minute >= 0) {
+                val h = hour.toString().padStart(2, '0')
+                val m = minute.toString().padStart(2, '0')
+                " ($h:$m)"
+            } else ""
+
+            startActiveVibration(context, id, title, "$body$timeStr")
         }
 
         if (id >= 0 && hour in 0..23 && minute in 0..59) {
@@ -95,6 +102,28 @@ object MedicationVibrationScheduler {
     fun handleStopTriggered(context: Context, intent: Intent) {
         val id = intent.getIntExtra(EXTRA_ID, -1)
         stopActiveVibration(context, id)
+
+        // 如果通知是被划掉的（DeleteIntent），在 1 分钟后自动重新提醒
+        if (id >= 0) {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val retryIntent = buildPendingIntent(
+                context = context,
+                id = id,
+                hour = -1, 
+                minute = -1,
+                flags = PendingIntent.FLAG_UPDATE_CURRENT or immutableFlag()
+            ) ?: return
+
+            val triggerAt = System.currentTimeMillis() + 60000 
+            
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, retryIntent)
+                } else {
+                    alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAt, retryIntent)
+                }
+            } catch (_: Exception) {}
+        }
     }
 
     fun isStopAction(intent: Intent): Boolean {
@@ -113,7 +142,6 @@ object MedicationVibrationScheduler {
 
         if (activeId >= 0) {
             cancelStopAlarm(context, activeId)
-            // 同时取消通知栏显示
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
             notificationManager.cancel(activeId)
         }
@@ -137,7 +165,6 @@ object MedicationVibrationScheduler {
             vibrator.vibrate(vibrationPattern, 0)
         }
 
-        // 显示通知并绑定删除意图（DeleteIntent）
         showNotificationWithDeleteIntent(context, id, title, body)
         scheduleStopAlarm(context, id)
     }
@@ -160,10 +187,16 @@ object MedicationVibrationScheduler {
         }
 
         val deleteIntent = buildStopPendingIntent(context, id, PendingIntent.FLAG_UPDATE_CURRENT or immutableFlag())
-        val contentIntent = Intent(context, MainActivity::class.java).let {
-            it.putExtra("stop_vibration", true) // 埋下标记
+        val contentIntent = Intent(context, MainActivity::class.java).apply {
+            action = Intent.ACTION_MAIN
+            addCategory(Intent.CATEGORY_LAUNCHER)
+            flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+            putExtra("stop_vibration", true)
+        }.let {
             PendingIntent.getActivity(context, id, it, PendingIntent.FLAG_UPDATE_CURRENT or immutableFlag())
         }
+
+        val alarmSound = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM)
 
         val builder = androidx.core.app.NotificationCompat.Builder(context, channelId)
             .setSmallIcon(context.resources.getIdentifier("ic_launcher", "mipmap", context.packageName))
@@ -171,6 +204,9 @@ object MedicationVibrationScheduler {
             .setContentText(body)
             .setPriority(androidx.core.app.NotificationCompat.PRIORITY_MAX)
             .setCategory(androidx.core.app.NotificationCompat.CATEGORY_ALARM)
+            .setSound(alarmSound)
+            .setFullScreenIntent(contentIntent, true)
+            .setOngoing(true)
             .setAutoCancel(true)
             .setDeleteIntent(deleteIntent)
             .setContentIntent(contentIntent)
@@ -190,22 +226,12 @@ object MedicationVibrationScheduler {
         ) ?: return
 
         try {
-            when {
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.M -> {
-                    alarmManager.setExactAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        triggerAtMillis,
-                        pendingIntent
-                    )
-                }
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT -> {
-                    alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
-                }
-                else -> {
-                    alarmManager.set(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
-                }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
+            } else {
+                alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
             }
-        } catch (_: SecurityException) {
+        } catch (_: Exception) {
             alarmManager.set(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
         }
     }
@@ -220,24 +246,12 @@ object MedicationVibrationScheduler {
         val triggerAtMillis = System.currentTimeMillis() + MAX_VIBRATION_DURATION_MS
 
         try {
-            when {
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.M -> {
-                    alarmManager.setExactAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        triggerAtMillis,
-                        pendingIntent
-                    )
-                }
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT -> {
-                    alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
-                }
-                else -> {
-                    alarmManager.set(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
-                }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
+            } else {
+                alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
             }
-        } catch (_: SecurityException) {
-            alarmManager.set(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
-        }
+        } catch (_: Exception) {}
     }
 
     private fun cancelStopAlarm(context: Context, id: Int) {
@@ -259,54 +273,38 @@ object MedicationVibrationScheduler {
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
         }
-
         if (!trigger.after(now)) {
             trigger.add(Calendar.DAY_OF_MONTH, 1)
         }
-
         return trigger.timeInMillis
     }
 
-    private fun buildPendingIntent(
-        context: Context,
-        id: Int,
-        hour: Int,
-        minute: Int,
-        flags: Int
-    ): PendingIntent? {
+    private fun buildPendingIntent(context: Context, id: Int, hour: Int, minute: Int, flags: Int): PendingIntent? {
         val intent = Intent(context, MedicationVibrationReceiver::class.java).apply {
             action = ACTION_VIBRATE
             putExtra(EXTRA_ID, id)
             putExtra(EXTRA_HOUR, hour)
             putExtra(EXTRA_MINUTE, minute)
         }
-
         return PendingIntent.getBroadcast(context, id, intent, flags)
     }
 
-    private fun buildStopPendingIntent(
-        context: Context,
-        id: Int,
-        flags: Int
-    ): PendingIntent? {
+    private fun buildStopPendingIntent(context: Context, id: Int, flags: Int): PendingIntent? {
         val intent = Intent(context, MedicationVibrationReceiver::class.java).apply {
             action = ACTION_STOP_VIBRATION
             putExtra(EXTRA_ID, id)
         }
-
         return PendingIntent.getBroadcast(context, id + STOP_REQUEST_CODE_OFFSET, intent, flags)
     }
 
     private fun saveReminder(context: Context, id: Int, title: String, body: String, hour: Int, minute: Int) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit()
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
             .putString("$PREF_KEY_PREFIX$id", "$title|||$body|||$hour|||$minute")
             .apply()
     }
 
     private fun removeReminder(context: Context, id: Int) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit()
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
             .remove("$PREF_KEY_PREFIX$id")
             .apply()
     }
@@ -322,10 +320,6 @@ object MedicationVibrationScheduler {
     }
 
     private fun immutableFlag(): Int {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            PendingIntent.FLAG_IMMUTABLE
-        } else {
-            0
-        }
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
     }
 }

@@ -50,7 +50,7 @@ class NotificationService {
           _notificationsPlugin.resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>();
 
-      // 1. 申请常规通知权限
+      // 1. 申请常规通知权限（Android 13+ 必选，否则前台服务起不来）
       await androidPlugin?.requestNotificationsPermission();
       await androidPlugin?.requestExactAlarmsPermission();
       await androidPlugin?.requestFullScreenIntentPermission();
@@ -176,5 +176,35 @@ class NotificationService {
     } on MissingPluginException {
       // 兼容非标准启动场景。
     }
+  }
+
+  /// 启动前台守护服务 (当有未完成任务时调用)
+  Future<void> startForegroundService() async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _vibrationChannel.invokeMethod<void>('startForegroundService');
+    } catch (_) {}
+  }
+
+  /// 更新前台守护通知的内容
+  Future<void> updateForegroundService({
+    required String title,
+    required String body,
+  }) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _vibrationChannel.invokeMethod<void>('updateForegroundService', {
+        'title': title,
+        'body': body,
+      });
+    } catch (_) {}
+  }
+
+  /// 停止前台守护服务 (当药吃完或没有药时调用)
+  Future<void> stopForegroundService() async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _vibrationChannel.invokeMethod<void>('stopForegroundService');
+    } catch (_) {}
   }
 }

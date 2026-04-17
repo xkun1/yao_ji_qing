@@ -180,6 +180,10 @@ class DatabaseService {
   }
 
   Future<void> _ensureDemoMedicines() async {
+    // [核心改进] 如果数据库里已经有药了，不管是什么药，都不要再自动生成演示数据了
+    final count = await isar.medicines.count();
+    if (count > 0) return;
+
     const demoItems = [
       DemoMedication(
         name: '维生素D滴剂',
@@ -314,20 +318,32 @@ class DatabaseService {
   }
 
   Future<void> deleteMedication(Medicine medicine) async {
+    final id = medicine.id;
+    if (id == Isar.autoIncrement) return; // 防止未保存的对象触发删除
+
     await medicine.reminders.load();
-    final reminderIds = medicine.reminders.map((reminder) => reminder.id).toList();
-    for (final reminderId in reminderIds) {
-      await _notifService.cancelReminder(reminderId);
+    final reminderIds = medicine.reminders.map((r) => r.id).toList();
+
+    // 1. 先取消系统层面的闹钟
+    for (final rId in reminderIds) {
+      await _notifService.cancelReminder(rId);
     }
 
+    // 2. 数据库全量清理
     await isar.writeTxn(() async {
-      await isar.medicines.delete(medicine.id);
-      await isar.reminders.deleteAll(reminderIds);
-      final relatedLogs = await isar.intakeLogs
+      // 删除关联的用药记录 (IntakeLog)
+      await isar.intakeLogs
           .filter()
           .medicineNameEqualTo(medicine.name)
-          .findAll();
-      await isar.intakeLogs.deleteAll(relatedLogs.map((log) => log.id).toList());
+          .deleteAll();
+      
+      // 删除关联的提醒设置 (Reminder)
+      if (reminderIds.isNotEmpty) {
+        await isar.reminders.deleteAll(reminderIds);
+      }
+      
+      // 最后删除药品本身
+      await isar.medicines.delete(id);
     });
   }
 

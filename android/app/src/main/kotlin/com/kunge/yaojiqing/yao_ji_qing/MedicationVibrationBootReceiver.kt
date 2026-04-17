@@ -1,4 +1,4 @@
-package com.kunge.yaojiqing.yao_ji_qing
+package com.kunge.yaojiqing
 
 import android.content.BroadcastReceiver
 import android.content.Context
