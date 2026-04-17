@@ -12,7 +12,7 @@ class SetupGuideScreen extends StatefulWidget {
     final bool isDone = prefs.getBool('setup_guide_done') ?? false;
 
     if (!isDone && context.mounted) {
-      Navigator.of(context).push(
+      await Navigator.of(context).push(
         MaterialPageRoute(
           fullscreenDialog: true,
           builder: (context) => const SetupGuideScreen(),

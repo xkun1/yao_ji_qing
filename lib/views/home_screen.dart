@@ -89,6 +89,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       final bool needGuide = !(prefs.getBool('feature_guide_done_v5') ?? false);
       
       if (needGuide && mounted) {
+        // 先构建模拟数据并强制刷新一次 UI
         setState(() {
           _isGuiding = true;
           _guideTask = TodayMedicationTask(
@@ -98,26 +99,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             isTaken: false,
           );
         });
+        
+        await _loadTodayTasks();
+        await Future.delayed(const Duration(milliseconds: 200)); // 等待渲染完成
 
-        await FeatureGuideOverlay.checkAndShow(
-          context,
-          settingsKey: _settingsKey,
-          progressKey: _progressKey,
-          fabKey: _fabKey,
-          statsKey: _statsKey,
-          firstTaskKey: _firstTaskKey,
-          editKey: _editKey,
-          deleteKey: _deleteKey,
-          onFinish: () {
-            if (mounted) {
-              setState(() {
-                _isGuiding = false;
-                _guideTask = null;
-              });
-              _loadTodayTasks();
-            }
-          },
-        );
+        if (mounted) {
+          await FeatureGuideOverlay.checkAndShow(
+            context,
+            settingsKey: _settingsKey,
+            progressKey: _progressKey,
+            fabKey: _fabKey,
+            statsKey: _statsKey,
+            firstTaskKey: _firstTaskKey,
+            editKey: _editKey,
+            deleteKey: _deleteKey,
+            onFinish: () {
+              if (mounted) {
+                setState(() {
+                  _isGuiding = false;
+                  _guideTask = null;
+                });
+                _loadTodayTasks();
+              }
+            },
+          );
+        }
       }
     });
   }
