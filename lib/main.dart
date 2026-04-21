@@ -1,29 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_gemma/flutter_gemma.dart';
-import 'views/splash_screen.dart';
+
 import 'services/database_service.dart';
 import 'services/notification_service.dart';
+import 'views/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 初始化本地 AI 引擎
-  await FlutterGemma.initialize();
-
-  // 设置沉浸式状态栏 (状态栏全透明)
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.dark, // 默认黑色图标（适配浅色背景）
+    statusBarIconBrightness: Brightness.dark,
     systemNavigationBarColor: Colors.white,
     systemNavigationBarIconBrightness: Brightness.dark,
   ));
 
-  // 初始化闹钟服务
   final notifService = NotificationService();
   await notifService.init();
 
-  // 初始化数据库
   final dbService = DatabaseService();
   await dbService.init();
 

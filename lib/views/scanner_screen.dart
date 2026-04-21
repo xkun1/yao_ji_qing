@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import '../services/gemini_service.dart';
 import '../services/database_service.dart';
 import 'package:background_downloader/background_downloader.dart';
+import '../widgets/scanner_result_editor.dart';
 
 class ScannerScreen extends StatefulWidget {
   final XFile? initialImage;
@@ -123,15 +124,13 @@ class _ScannerScreenState extends State<ScannerScreen> {
     _processImage(image);
   }
 
-  Future<void> _confirmAndSave() async {
-    if (_result != null) {
-      await _dbService.saveMedicationFromAI(_result!);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("药剂已保存并开启提醒！")),
-        );
-        Navigator.pop(context, true);
-      }
+  Future<void> _confirmAndSave(MedicationInfo info) async {
+    await _dbService.saveMedicationFromAI(info);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("药剂已保存并开启提醒！")),
+      );
+      Navigator.pop(context, true);
     }
   }
 
@@ -235,59 +234,9 @@ class _ScannerScreenState extends State<ScannerScreen> {
   }
 
   Widget _buildResult() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: const Color(0xFFF0FDF4), borderRadius: BorderRadius.circular(16)),
-            child: const Row(
-              children: [
-                Icon(Icons.check_circle, color: Color(0xFF22C55E)),
-                SizedBox(width: 12),
-                Text("本地识别成功！", style: TextStyle(color: Color(0xFF166534), fontWeight: FontWeight.bold)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          _buildInfoTile("药名", _result!.name),
-          _buildInfoTile("剂量", _result!.dosage),
-          _buildInfoTile("频次", "每天 ${_result!.frequency} 次"),
-          _buildInfoTile("时间点", _result!.times.join(", ")),
-          _buildInfoTile("注意事项", _result!.precautions, isWarning: true),
-          const SizedBox(height: 40),
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: FilledButton(
-              onPressed: _confirmAndSave,
-              style: FilledButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-              child: const Text("确定，开启提醒", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoTile(String label, String value, {bool isWarning = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 12, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
-          Text(value, style: TextStyle(
-            fontSize: 16, 
-            fontWeight: FontWeight.bold,
-            color: isWarning ? Colors.orange[800] : const Color(0xFF1F2937),
-          )),
-          const Divider(color: Color(0xFFF3F4F6)),
-        ],
-      ),
+    return ScannerResultEditor(
+      result: _result!,
+      onSave: _confirmAndSave,
     );
   }
 }
