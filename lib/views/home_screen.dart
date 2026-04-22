@@ -490,6 +490,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     bool isActive = _currentIndex == index;
     return InkWell(
       onTap: () => setState(() => _currentIndex = index),
+      splashColor: Colors.transparent, // 禁用扩散效果
+      highlightColor: Colors.transparent, // 禁用高亮效果
+      hoverColor: Colors.transparent, // 禁用悬停效果
       child: AnimatedScale(
         scale: isActive ? 1.2 : 1.0,
         duration: const Duration(milliseconds: 200),

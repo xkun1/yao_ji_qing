@@ -6,6 +6,7 @@ import 'privacy_policy_screen.dart';
 import 'license_screen.dart';
 import '../services/database_service.dart';
 import '../services/gemini_service.dart';
+import '../services/notification_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -50,7 +51,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         color: Color(0xFF1F2937))),
                 subtitle: const Text("开启后，药师的回复将自动进行实时语音播报",
                     style: TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
-                activeColor: const Color(0xFF10B981),
+                activeThumbColor: const Color(0xFF10B981),
                 value: _aiService.autoSpeak,
                 onChanged: (bool value) async {
                   if (value) {
@@ -269,12 +270,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
 
     if (confirmed == true) {
+      // 1. 彻底撤回所有系统通知和前台服务
+      await NotificationService().cancelAllReminders();
+      
+      // 2. 仅抹除药品相关的业务数据
       await DatabaseService().isar.writeTxn(() async {
         await DatabaseService().isar.clear();
       });
+
       if (context.mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text("数据已全部重置")));
+            .showSnackBar(const SnackBar(content: Text("所有药品及用药记录已清空")));
         Navigator.pop(context);
       }
     }

@@ -101,16 +101,43 @@ class _ScannerResultEditorState extends State<ScannerResultEditor> {
             child: FilledButton(
               key: const Key('scanner_save_button'),
               onPressed: () {
-                final frequency = int.tryParse(_frequencyController.text.trim()) ?? 0;
-                final times = _timesController.text
+                final name = _nameController.text.trim();
+                if (name.isEmpty) {
+                  _showError('请输入药名');
+                  return;
+                }
+
+                final freqStr = _frequencyController.text.trim();
+                final frequency = int.tryParse(freqStr) ?? 0;
+                if (frequency <= 0 || frequency > 24) {
+                  _showError('每日频次需在 1-24 之间');
+                  return;
+                }
+
+                final timeStr = _timesController.text.trim();
+                final times = timeStr
                     .split(RegExp(r'[,，]'))
                     .map((value) => value.trim())
                     .where((value) => value.isNotEmpty)
                     .toList();
 
+                // 校验时间格式 (HH:mm)
+                final timeRegex = RegExp(r'^([01]\d|2[0-3]):[0-5]\d$');
+                for (final t in times) {
+                  if (!timeRegex.hasMatch(t)) {
+                    _showError('时间格式错误: "$t"\n请使用 24 小时制，如 08:00');
+                    return;
+                  }
+                }
+
+                if (times.length != frequency) {
+                  _showError('时间点数量 (${times.length}) 与频次 ($frequency) 不匹配');
+                  return;
+                }
+
                 widget.onSave(
                   MedicationInfo(
-                    name: _nameController.text.trim(),
+                    name: name,
                     dosage: _dosageController.text.trim(),
                     frequency: frequency,
                     times: times,
@@ -128,6 +155,16 @@ class _ScannerResultEditorState extends State<ScannerResultEditor> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFFEF4444),
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }

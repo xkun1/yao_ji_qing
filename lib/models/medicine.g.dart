@@ -2002,7 +2002,14 @@ const IntakeLogSchema = CollectionSchema(
   deserializeProp: _intakeLogDeserializeProp,
   idName: r'id',
   indexes: {},
-  links: {},
+  links: {
+    r'medicine': LinkSchema(
+      id: -6076981232451511009,
+      name: r'medicine',
+      target: r'Medicine',
+      single: true,
+    )
+  },
   embeddedSchemas: {},
   getId: _intakeLogGetId,
   getLinks: _intakeLogGetLinks,
@@ -2072,11 +2079,12 @@ Id _intakeLogGetId(IntakeLog object) {
 }
 
 List<IsarLinkBase<dynamic>> _intakeLogGetLinks(IntakeLog object) {
-  return [];
+  return [object.medicine];
 }
 
 void _intakeLogAttach(IsarCollection<dynamic> col, Id id, IntakeLog object) {
   object.id = id;
+  object.medicine.attach(col, col.isar.collection<Medicine>(), r'medicine', id);
 }
 
 extension IntakeLogQueryWhereSort
@@ -2485,7 +2493,20 @@ extension IntakeLogQueryObject
     on QueryBuilder<IntakeLog, IntakeLog, QFilterCondition> {}
 
 extension IntakeLogQueryLinks
-    on QueryBuilder<IntakeLog, IntakeLog, QFilterCondition> {}
+    on QueryBuilder<IntakeLog, IntakeLog, QFilterCondition> {
+  QueryBuilder<IntakeLog, IntakeLog, QAfterFilterCondition> medicine(
+      FilterQuery<Medicine> q) {
+    return QueryBuilder.apply(this, (query) {
+      return query.link(q, r'medicine');
+    });
+  }
+
+  QueryBuilder<IntakeLog, IntakeLog, QAfterFilterCondition> medicineIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.linkLength(r'medicine', 0, true, 0, true);
+    });
+  }
+}
 
 extension IntakeLogQuerySortBy on QueryBuilder<IntakeLog, IntakeLog, QSortBy> {
   QueryBuilder<IntakeLog, IntakeLog, QAfterSortBy> sortByActualTime() {

@@ -16,11 +16,8 @@ class NotificationService {
       MethodChannel('yao_ji_qing/medication_vibration');
   static const String _reminderChannelId = 'med_reminders_alarm_v4';
   static const String _reminderChannelName = '用药提醒通道';
-  static const int _insistentFlag = 4;
   static final Int64List _vibrationPattern =
       Int64List.fromList(<int>[0, 1200, 400, 1200, 400, 1800]);
-  static final Int32List _alarmNotificationFlags =
-      Int32List.fromList(<int>[_insistentFlag]);
 
   Future<void> init() async {
     tz.initializeTimeZones();
@@ -34,6 +31,7 @@ class NotificationService {
       requestAlertPermission: true,
       requestBadgePermission: true,
       requestSoundPermission: true,
+      requestCriticalPermission: false,
     );
 
     const InitializationSettings initSettings = InitializationSettings(
@@ -43,6 +41,9 @@ class NotificationService {
 
     await _notificationsPlugin.initialize(
       initSettings,
+      onDidReceiveNotificationResponse: (response) {
+        _stopActiveVibration();
+      },
     );
 
     if (Platform.isAndroid) {
@@ -50,7 +51,6 @@ class NotificationService {
           _notificationsPlugin.resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>();
 
-      // 1. 申请常规通知权限（Android 13+ 必选，否则前台服务起不来）
       await androidPlugin?.requestNotificationsPermission();
       await androidPlugin?.requestExactAlarmsPermission();
       await androidPlugin?.requestFullScreenIntentPermission();
@@ -67,18 +67,6 @@ class NotificationService {
         ),
       );
     }
-
-    await _notificationsPlugin.cancel(999);
-    if (Platform.isAndroid) {
-      await _notificationsPlugin
-          .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
-          ?.deleteNotificationChannel('test_channel');
-      await _notificationsPlugin
-          .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
-          ?.deleteNotificationChannel('med_reminders_v3');
-    }
   }
 
   Future<void> scheduleDailyReminder({
@@ -88,7 +76,6 @@ class NotificationService {
     required int hour,
     required int minute,
   }) async {
-    // 获取当前设备时区的时间
     final now = DateTime.now();
     var scheduleDate = DateTime(now.year, now.month, now.day, hour, minute);
 
@@ -96,29 +83,86 @@ class NotificationService {
       scheduleDate = scheduleDate.add(const Duration(days: 1));
     }
 
-    // 转换成 TZDateTime
     final tzScheduleDate = tz.TZDateTime.from(scheduleDate, tz.local);
 
-    // [变更点] 不再让插件发通知，让原生发通知（为了接管 DeleteIntent）
-    // await _notificationsPlugin.zonedSchedule(
-    //   id,
-    //   title,
-    //   body,
-    //   ...
-    // );
+    if (Platform.isIOS) {
+      // 1. 基础通知 (ID 为原始 id)
+      await _notificationsPlugin.zonedSchedule(
+        id,
+        title,
+        body,
+        tzScheduleDate,
+        const NotificationDetails(
+          iOS: DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+            sound: 'default',
+            interruptionLevel: InterruptionLevel.timeSensitive,
+          ),
+        ),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time,
+      );
 
-    await _scheduleDailyNativeVibration(
-      id: id,
-      title: title,
-      body: body,
-      hour: hour,
-      minute: minute,
-    );
+      // 2. iOS 连环提醒：接下来的 5 分钟内 (ID 偏移 20000 避免冲突)
+      for (int i = 1; i <= 9; i++) {
+        final repeatDate = tzScheduleDate.add(Duration(seconds: i * 30));
+        await _notificationsPlugin.zonedSchedule(
+          id + i * 20000,
+          "🔔 再次提醒：$title",
+          body,
+          repeatDate,
+          const NotificationDetails(
+            iOS: DarwinNotificationDetails(
+              presentAlert: true,
+              presentBadge: true,
+              presentSound: true,
+              sound: 'default',
+              interruptionLevel: InterruptionLevel.timeSensitive,
+            ),
+          ),
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          matchDateTimeComponents: DateTimeComponents.time,
+        );
+      }
+    }
+
+    if (Platform.isAndroid) {
+      await _scheduleDailyNativeVibration(
+        id: id,
+        title: title,
+        body: body,
+        hour: hour,
+        minute: minute,
+      );
+    }
   }
 
   Future<void> cancelReminder(int id) async {
-    await _notificationsPlugin.cancel(id);
+    if (Platform.isIOS) {
+      // 彻底清理 iOS 连环提醒组
+      await _notificationsPlugin.cancel(id);
+      for (int i = 1; i <= 9; i++) {
+        await _notificationsPlugin.cancel(id + i * 20000);
+      }
+    } else {
+      await _notificationsPlugin.cancel(id);
+    }
+    await _stopActiveVibration();
     await _cancelNativeVibration(id);
+  }
+
+  Future<void> cancelAllReminders() async {
+    await _notificationsPlugin.cancelAll();
+    await stopForegroundService();
+    if (Platform.isAndroid) {
+      await _vibrationChannel.invokeMethod<void>('stopActiveVibration');
+    }
   }
 
   Future<void> _scheduleDailyNativeVibration({
@@ -140,10 +184,7 @@ class NotificationService {
         'minute': minute,
       });
     } on PlatformException {
-      // 原生震动兜底失败时，不影响系统通知本身的调度。
-    } on MissingPluginException {
-      // 兼容非标准启动场景，避免 MethodChannel 未注册导致提醒保存失败。
-    }
+    } on MissingPluginException {}
   }
 
   Future<void> _cancelNativeVibration(int id) async {
@@ -155,15 +196,7 @@ class NotificationService {
         'id': id,
       });
     } on PlatformException {
-      // 系统通知取消成功即可，原生震动取消失败不阻断业务流程。
-    } on MissingPluginException {
-      // 兼容 MethodChannel 未注册场景。
-    }
-  }
-
-  /// 用户交互通知时停止当前正在活跃的振动。
-  void _onDidReceiveNotificationResponse(NotificationResponse response) {
-    _stopActiveVibration();
+    } on MissingPluginException {}
   }
 
   Future<void> _stopActiveVibration() async {
@@ -172,13 +205,9 @@ class NotificationService {
     try {
       await _vibrationChannel.invokeMethod<void>('stopActiveVibration');
     } on PlatformException {
-      // 停止失败不影响交互流程。
-    } on MissingPluginException {
-      // 兼容非标准启动场景。
-    }
+    } on MissingPluginException {}
   }
 
-  /// 启动前台守护服务 (当有未完成任务时调用)
   Future<void> startForegroundService() async {
     if (!Platform.isAndroid) return;
     try {
@@ -186,7 +215,6 @@ class NotificationService {
     } catch (_) {}
   }
 
-  /// 更新前台守护通知的内容
   Future<void> updateForegroundService({
     required String title,
     required String body,
@@ -200,7 +228,6 @@ class NotificationService {
     } catch (_) {}
   }
 
-  /// 停止前台守护服务 (当药吃完或没有药时调用)
   Future<void> stopForegroundService() async {
     if (!Platform.isAndroid) return;
     try {

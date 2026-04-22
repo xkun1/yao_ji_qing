@@ -16,13 +16,14 @@ class ModelManagerScreen extends StatefulWidget {
 class _ModelManagerScreenState extends State<ModelManagerScreen> {
   final GeminiService _aiService = GeminiService();
 
+  bool _initialLoading = true;
   bool _gemmaReady = false;
   bool _asrReady = false;
   bool _ttsReady = false;
 
-  String _gemmaSize = '检测中...';
-  String _asrSize = '检测中...';
-  String _ttsSize = '检测中...';
+  String _gemmaSize = '';
+  String _asrSize = '';
+  String _ttsSize = '';
 
   bool _isProcessing = false;
   String? _downloadingType;
@@ -120,6 +121,7 @@ class _ModelManagerScreenState extends State<ModelManagerScreen> {
         _gemmaSize = gSize;
         _asrSize = aSize;
         _ttsSize = tSize;
+        _initialLoading = false;
       });
     }
   }
@@ -158,10 +160,12 @@ class _ModelManagerScreenState extends State<ModelManagerScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _buildModelCard(
+      body: _initialLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                _buildModelCard(
             title: "对话引擎 (Gemma 4)",
             subtitle: "本地大语言模型，负责理解与回复",
             size: _gemmaSize,
@@ -398,19 +402,55 @@ class _ModelManagerScreenState extends State<ModelManagerScreen> {
       } else if (type == 'tts') {
         await _aiService.downloadTtsModel();
       }
+      
+      // 如果运行到这里还没有重启（虽然 service 内部可能已经触发），我们手动检查并提示
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("模型下载安装完成")),
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => WillPopScope(
+            onWillPop: () async => false,
+            child: const AlertDialog(
+              title: Text("安装完成"),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 20),
+                  Text("正在重启应用以加载新引擎，请稍候..."),
+                ],
+              ),
+            ),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("下载安装失败: $e"),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+        String errorMsg = e.toString();
+        if (errorMsg.contains('iOS 调试模式限制')) {
+          // 针对 iOS Debug 的特殊处理
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              title: const Text("安装完成"),
+              content: Text(errorMsg.replaceAll('GeminiChatException: ', '')),
+              actions: [
+                FilledButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("我知道了"),
+                ),
+              ],
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("下载安装失败: $e"),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
       }
     } finally {
       if (mounted) {

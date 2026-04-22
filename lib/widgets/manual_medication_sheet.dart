@@ -185,25 +185,41 @@ class _ManualMedicationSheetState extends State<ManualMedicationSheet> {
                   width: double.infinity,
                   height: 52,
                   child: OutlinedButton(
-                    onPressed: () async {
+                    onPressed: _isSaving ? null : () async {
                       final confirmed = await showDialog<bool>(
                         context: context,
                         builder: (context) => AlertDialog(
-                          title: const Text("结束提醒"),
-                          content: Text("确定要结束「${widget.medicine!.name}」的每日提醒吗？相关记录也将被删除。"),
+                          title: const Text("结束并删除提醒"),
+                          content: Text("确定要结束「${widget.medicine!.name}」的每日提醒吗？相关用药记录也将被永久删除。"),
                           actions: [
                             TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("取消")),
-                            FilledButton(onPressed: () => Navigator.pop(context, true), style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEF4444)), child: const Text("确定结束")),
+                            FilledButton(
+                              onPressed: () => Navigator.pop(context, true), 
+                              style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEF4444)), 
+                              child: const Text("确定结束")
+                            ),
                           ],
                         ),
                       );
-                      if (confirmed == true) {
-                        await DatabaseService().deleteMedication(widget.medicine!);
-                        if (mounted) Navigator.pop(context, true);
+                      
+                      if (confirmed == true && mounted) {
+                        setState(() => _isSaving = true);
+                        try {
+                          // 核心：彻底删除，内部已包含 iOS 连环提醒和 Android 止震逻辑
+                          await DatabaseService().deleteMedication(widget.medicine!);
+                          if (mounted) Navigator.pop(context, true);
+                        } catch (e) {
+                          if (mounted) {
+                            setState(() => _isSaving = false);
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("操作失败: $e")));
+                          }
+                        }
                       }
                     },
                     style: OutlinedButton.styleFrom(side: const BorderSide(color: Color(0xFFFCA5A5)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-                    child: const Text("结束此药品提醒", style: TextStyle(color: Color(0xFFEF4444), fontSize: 16, fontWeight: FontWeight.bold)),
+                    child: _isSaving 
+                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Color(0xFFEF4444), strokeWidth: 2))
+                      : const Text("结束此药品提醒", style: TextStyle(color: Color(0xFFEF4444), fontSize: 16, fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],

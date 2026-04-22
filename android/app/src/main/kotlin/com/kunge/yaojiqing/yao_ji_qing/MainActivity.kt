@@ -181,46 +181,50 @@ class MainActivity: FlutterActivity() {
                     ))
                 }
                 "restartApp" -> {
-                    val componentName = ComponentName(applicationContext, MainActivity::class.java)
-                    val intent = Intent.makeRestartActivityTask(componentName).apply {
-                        setPackage(packageName)
-                        putExtra("restarted_after_model_download", true)
+                    val packageManager = applicationContext.packageManager
+                    val intent = packageManager.getLaunchIntentForPackage(packageName)
+                    val componentName = intent?.component
+                    val mainIntent = Intent.makeRestartActivityTask(componentName)
+                    mainIntent.putExtra("restarted_after_model_download", true)
+                    
+                    val pendingIntentFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_CANCEL_CURRENT
+                    } else {
+                        PendingIntent.FLAG_CANCEL_CURRENT
                     }
+
                     val restartIntent = PendingIntent.getActivity(
                         applicationContext, 
                         9999,
-                        intent, 
-                        PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
+                        mainIntent, 
+                        pendingIntentFlags
                     )
+                    
                     val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
-                    val restartAt = System.currentTimeMillis() + 1500
-                    when {
-                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms() -> {
-                            alarmManager.setAlarmClock(
-                                AlarmManager.AlarmClockInfo(restartAt, restartIntent),
-                                restartIntent
-                            )
-                        }
-                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.M -> {
+                    // 稍微拉长延迟到 2 秒，给系统更多反应时间
+                    val restartAt = System.currentTimeMillis() + 2000
+                    
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && alarmManager.canScheduleExactAlarms()) {
                             alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, restartAt, restartIntent)
-                        }
-                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT -> {
-                            alarmManager.setExact(AlarmManager.RTC_WAKEUP, restartAt, restartIntent)
-                        }
-                        else -> {
+                        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, restartAt, restartIntent)
+                        } else {
                             alarmManager.set(AlarmManager.RTC_WAKEUP, restartAt, restartIntent)
                         }
+                    } catch (e: Exception) {
+                        // 如果精准闹钟失败，用普通闹钟兜底
+                        alarmManager.set(AlarmManager.RTC_WAKEUP, restartAt, restartIntent)
                     }
+
                     result.success(true)
+                    
+                    // 延迟 1 秒再退出，确保结果已返回给 Flutter 侧且闹钟已落盘
                     android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                            finishAndRemoveTask()
-                        } else {
-                            finishAffinity()
-                        }
+                        finishAffinity()
                         android.os.Process.killProcess(android.os.Process.myPid())
-                        kotlin.system.exitProcess(0)
-                    }, 500)
+                        System.exit(0)
+                    }, 1000)
                 }
                 else -> result.notImplemented()
             }

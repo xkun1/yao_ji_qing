@@ -7,9 +7,8 @@ class SetupGuideScreen extends StatefulWidget {
   const SetupGuideScreen({super.key});
 
   static Future<void> checkAndShow(BuildContext context) async {
-    if (!Platform.isAndroid) return;
     final prefs = await SharedPreferences.getInstance();
-    final bool isDone = prefs.getBool('setup_guide_done') ?? false;
+    final bool isDone = prefs.getBool('setup_guide_done_v5') ?? false;
 
     if (!isDone && context.mounted) {
       await Navigator.of(context).push(
@@ -53,6 +52,17 @@ class _SetupGuideScreenState extends State<SetupGuideScreen> with WidgetsBinding
   }
 
   Future<void> _updateActualStatus() async {
+    if (Platform.isIOS) {
+      setState(() {
+        _batteryDone = true;
+        _alarmsDone = true;
+        _notificationsDone = true; 
+        _autoStartDone = true;
+        _isLoading = false;
+      });
+      return;
+    }
+
     try {
       final Map<dynamic, dynamic>? status = await const MethodChannel('yao_ji_qing/medication_vibration')
           .invokeMethod('checkActualPermissions');
@@ -72,11 +82,15 @@ class _SetupGuideScreenState extends State<SetupGuideScreen> with WidgetsBinding
 
   Future<void> _markAsDone() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('setup_guide_done', true);
+    await prefs.setBool('setup_guide_done_v5', true);
   }
 
   void _openAppSettings() {
-    const MethodChannel('yao_ji_qing/medication_vibration').invokeMethod('openAppSettings');
+    if (Platform.isIOS) {
+      const MethodChannel('yao_ji_qing/medication_vibration').invokeMethod('openAppSettings');
+    } else {
+      const MethodChannel('yao_ji_qing/medication_vibration').invokeMethod('openAppSettings');
+    }
   }
 
   void _openBatterySettings() {
@@ -90,8 +104,8 @@ class _SetupGuideScreenState extends State<SetupGuideScreen> with WidgetsBinding
 
   @override
   Widget build(BuildContext context) {
-    // 只有三项真实权限通过，且用户点过“自启动管理”，才允许进入
-    final bool canProceed = _batteryDone && _alarmsDone && _notificationsDone && _autoStartDone;
+    final bool isIOS = Platform.isIOS;
+    final bool canProceed = _batteryDone && _alarmsDone && _notificationsDone && (isIOS || _autoStartDone);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -106,9 +120,9 @@ class _SetupGuideScreenState extends State<SetupGuideScreen> with WidgetsBinding
               const SizedBox(height: 30),
               const Icon(Icons.verified_user_rounded, size: 56, color: Color(0xFF3B82F6)),
               const SizedBox(height: 20),
-              const Text(
-                "您好，检测到系统权限未就绪",
-                style: TextStyle(
+              Text(
+                isIOS ? "用药提醒权限设置" : "您好，检测到系统权限未就绪",
+                style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
                   color: Color(0xFF1F2937),
@@ -116,49 +130,60 @@ class _SetupGuideScreenState extends State<SetupGuideScreen> with WidgetsBinding
                 ),
               ),
               const SizedBox(height: 10),
-              const Text(
-                "安卓系统会自动拦截后台任务，请按以下顺序开启全部权限。",
-                style: TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
+              Text(
+                isIOS ? "为了确保药师能准时提醒您，请确保开启以下设置。" : "安卓系统会自动拦截后台任务，请按以下顺序开启全部权限。",
+                style: const TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
               ),
               const SizedBox(height: 24),
               
               Expanded(
                 child: ListView(
                   children: [
+                    if (!isIOS) ...[
+                      _buildStepCard(
+                        title: "1. 忽略电池优化",
+                        desc: "允许 App 在后台持续运行不休眠。",
+                        isDone: _batteryDone,
+                        onTap: _openBatterySettings,
+                      ),
+                      const SizedBox(height: 14),
+                      _buildStepCard(
+                        title: "2. 开启精确闹钟",
+                        desc: "获取最高提醒优先级，确保准时弹出。",
+                        isDone: _alarmsDone,
+                        onTap: _openAppSettings,
+                      ),
+                      const SizedBox(height: 14),
+                      _buildStepCard(
+                        title: "3. 开启自启动管理",
+                        desc: "针对华为/荣耀/小米：设为“手动管理”并开启全部开关。",
+                        isDone: _autoStartDone,
+                        onTap: _openAutoStartSettings,
+                      ),
+                      const SizedBox(height: 14),
+                    ],
                     _buildStepCard(
-                      title: "1. 忽略电池优化",
-                      desc: "允许 App 在后台持续运行不休眠。",
-                      isDone: _batteryDone,
-                      onTap: _openBatterySettings,
-                    ),
-                    const SizedBox(height: 14),
-                    _buildStepCard(
-                      title: "2. 开启精确闹钟",
-                      desc: "获取最高提醒优先级，确保准时弹出。",
-                      isDone: _alarmsDone,
-                      onTap: _openAppSettings,
-                    ),
-                    const SizedBox(height: 14),
-                    _buildStepCard(
-                      title: "3. 开启自启动管理",
-                      desc: "针对华为/荣耀/小米：设为“手动管理”并开启全部开关。",
-                      isDone: _autoStartDone,
-                      onTap: _openAutoStartSettings,
-                    ),
-                    const SizedBox(height: 14),
-                    _buildStepCard(
-                      title: "4. 允许显示通知",
-                      desc: "若不开启此项，我们将无法在通知栏提醒。",
+                      title: isIOS ? "允许显示通知" : "4. 允许显示通知",
+                      desc: isIOS ? "由于 iOS 系统限制，若不开启此项，您将收不到用药提醒。" : "若不开启此项，我们将无法在通知栏提醒。",
                       isDone: _notificationsDone,
                       onTap: _openAppSettings,
                     ),
+                    if (isIOS) ...[
+                      const SizedBox(height: 14),
+                      _buildStepCard(
+                        title: "后台应用刷新",
+                        desc: "确保系统能够在后台及时准备提醒内容。",
+                        isDone: true,
+                        onTap: _openAppSettings,
+                      ),
+                    ],
                   ],
                 ),
               ),
               
               SizedBox(
                 width: double.infinity,
-                height: 56,
+                height: 52,
                 child: FilledButton(
                   onPressed: canProceed
                       ? () {

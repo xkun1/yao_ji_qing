@@ -58,10 +58,15 @@ class _StatsScreenState extends State<StatsScreen> {
     Map<String, int> buckets = {"早晨 (05-11)": 0, "中午 (11-16)": 0, "晚上 (16-21)": 0, "深夜 (21-05)": 0};
     for (var log in logs.where((l) => l.isTaken)) {
       int hour = log.planTime.hour;
-      if (hour >= 5 && hour < 11) buckets["早晨 (05-11)"] = buckets["早晨 (05-11)"]! + 1;
-      else if (hour >= 11 && hour < 16) buckets["中午 (11-16)"] = buckets["中午 (11-16)"]! + 1;
-      else if (hour >= 16 && hour < 21) buckets["晚上 (16-21)"] = buckets["晚上 (16-21)"]! + 1;
-      else buckets["深夜 (21-05)"] = buckets["深夜 (21-05)"]! + 1;
+      if (hour >= 5 && hour < 11) {
+        buckets["早晨 (05-11)"] = buckets["早晨 (05-11)"]! + 1;
+      } else if (hour >= 11 && hour < 16) {
+        buckets["中午 (11-16)"] = buckets["中午 (11-16)"]! + 1;
+      } else if (hour >= 16 && hour < 21) {
+        buckets["晚上 (16-21)"] = buckets["晚上 (16-21)"]! + 1;
+      } else {
+        buckets["深夜 (21-05)"] = buckets["深夜 (21-05)"]! + 1;
+      }
     }
 
     if (mounted) {

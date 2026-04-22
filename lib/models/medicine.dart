@@ -35,6 +35,8 @@ class IntakeLog {
   
   late DateTime planTime;   // 计划时间
   DateTime? actualTime;     // 实际服用时间
-  late String medicineName; // 冗余一份药名方便查询
+  late String medicineName; // 冗余药名
   bool isTaken = false;     // 是否已吃
+  
+  final medicine = IsarLink<Medicine>(); // 强关联：用药所属药品
 }

@@ -586,7 +586,7 @@ class GeminiService {
       );
       await _deleteFiles([File('${modelRoot.path}/$_asrArchiveId')]);
       _setModelDownloadStage('asr', 1, '下载完成，正在重启...');
-      await _restartApp();
+      await restartApp();
       _clearModelDownloadSnapshot();
     } catch (_) {
       _clearModelDownloadSnapshot();
@@ -622,7 +622,7 @@ class GeminiService {
       );
       await _deleteFiles([File('${modelRoot.path}/$_ttsArchiveId')]);
       _setModelDownloadStage('tts', 1, '下载完成，正在重启...');
-      await _restartApp();
+      await restartApp();
       _clearModelDownloadSnapshot();
     } catch (_) {
       _clearModelDownloadSnapshot();
@@ -686,7 +686,7 @@ class GeminiService {
           fileType: ModelFileType.litertlm,
         ).fromFile(existingPath).install();
         _setModelDownloadStage('gemma', 1, '下载完成，正在重启...');
-        await _restartApp();
+        await restartApp();
         _clearModelDownloadSnapshot();
         return;
       }
@@ -714,7 +714,7 @@ class GeminiService {
         minBytes: _minGemmaModelBytes,
       );
       _setModelDownloadStage('gemma', 1, '下载完成，正在重启...');
-      await _restartApp();
+      await restartApp();
       _clearModelDownloadSnapshot();
     } catch (_) {
       _clearModelDownloadSnapshot();
@@ -1095,10 +1095,25 @@ class GeminiService {
     return '本地药师暂时忙不过来，请稍后再试。';
   }
 
-  Future<void> _restartApp() async {
+  Future<void> restartApp() async {
     try {
-      await _vibrationChannel.invokeMethod('restartApp');
-    } catch (_) {}
+      if (Platform.isAndroid) {
+        await _vibrationChannel.invokeMethod('restartApp');
+      } else {
+        // iOS 逻辑
+        if (kDebugMode) {
+          // Debug 模式下如果 exit(0)，用户手动点击图标会触发 iOS 14+ 限制报错
+          // 抛出异常让 UI 层捕获并显示友好提示
+          throw GeminiChatException('iOS 调试模式限制：请在 Android Studio 中重新点击运行按钮以加载新模型。');
+        } else {
+          exit(0);
+        }
+      }
+    } catch (e) {
+      if (e is GeminiChatException) rethrow;
+      debugPrint('重启指令发送失败: $e');
+      if (!kDebugMode) exit(0);
+    }
   }
 
   Future<MedicationInfo?> extractMedicationInfo(

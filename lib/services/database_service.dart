@@ -76,7 +76,7 @@ class DatabaseService {
         );
         final log = await isar.intakeLogs
             .filter()
-            .medicineNameEqualTo(medicine.name)
+            .medicine((q) => q.idEqualTo(medicine.id))
             .planTimeEqualTo(planTime)
             .findFirst();
 
@@ -99,7 +99,7 @@ class DatabaseService {
   Future<void> markTaskTaken(TodayMedicationTask task) async {
     final existing = await isar.intakeLogs
         .filter()
-        .medicineNameEqualTo(task.medicine.name)
+        .medicine((q) => q.idEqualTo(task.medicine.id))
         .planTimeEqualTo(task.planTime)
         .findFirst();
 
@@ -112,9 +112,19 @@ class DatabaseService {
       log
         ..actualTime = DateTime.now()
         ..isTaken = true;
+      
+      log.medicine.value = task.medicine;
 
       await isar.intakeLogs.put(log);
+      await log.medicine.save();
     });
+
+    // 核心优化：吃完药立刻清掉通知中心的所有残留提醒（特别是 iOS 的连环提醒）
+    await _notifService.cancelReminder(task.reminder.id);
+    
+    // 注意：不再需要在此处调用 scheduleDailyReminder。
+    // 因为最初在添加药品时已经通过 Daily 模式排期，系统会自动处理明天的提醒。
+    // 手动调用反而可能触发 iOS 本分钟内的残留提醒复活。
   }
 
   Future<void> rescheduleAllActiveReminders() async {
@@ -168,15 +178,30 @@ class DatabaseService {
     String? note,
     required List<ReminderTime> times,
   }) async {
+    final oldName = medicine.name;
     await medicine.reminders.load();
     final oldReminderIds = medicine.reminders.map((reminder) => reminder.id).toList();
 
+    // 1. 核心修复：修改前，先彻底撤回所有旧通知（包含 iOS 连环提醒组）
     for (final reminderId in oldReminderIds) {
       await _notifService.cancelReminder(reminderId);
     }
 
     final remindersToSchedule = <Reminder>[];
     await isar.writeTxn(() async {
+      // 2. 如果药名变了，同步更新服药历史中的冗余药名，确保统计页面名字一致
+      if (oldName != name) {
+        final logs = await isar.intakeLogs
+            .filter()
+            .medicine((q) => q.idEqualTo(medicine.id))
+            .findAll();
+        for (final log in logs) {
+          log.medicineName = name;
+          await isar.intakeLogs.put(log);
+        }
+      }
+
+      // 3. 更新药品主体信息
       medicine
         ..name = name
         ..dosage = dosage
@@ -184,6 +209,7 @@ class DatabaseService {
         ..instruction = medicine.instruction ?? '手动输入'
         ..note = note;
 
+      // 4. 清除旧提醒规则，创建新规则（这会产生全新的 ID，防止冲突）
       medicine.reminders.clear();
       await medicine.reminders.save();
       await isar.reminders.deleteAll(oldReminderIds);
@@ -200,6 +226,7 @@ class DatabaseService {
       await medicine.reminders.save();
     });
 
+    // 5. 开启全新的守护排期
     for (final reminder in remindersToSchedule) {
       await _notifService.scheduleDailyReminder(
         id: reminder.id,
@@ -213,32 +240,37 @@ class DatabaseService {
 
   Future<void> deleteMedication(Medicine medicine) async {
     final id = medicine.id;
-    if (id == Isar.autoIncrement) return; // 防止未保存的对象触发删除
+    if (id == Isar.autoIncrement) return; 
 
+    // 1. 加载并获取所有关联的提醒 ID
     await medicine.reminders.load();
     final reminderIds = medicine.reminders.map((r) => r.id).toList();
 
-    // 1. 先取消系统层面的闹钟
+    // 2. 彻底取消系统层面的通知（包含 iOS 的连环提醒组和 Android 震动）
+    // 注意：必须在删除数据库前执行，否则后面可能拿不到 reminder 数据
     for (final rId in reminderIds) {
       await _notifService.cancelReminder(rId);
     }
 
-    // 2. 数据库全量清理
+    // 3. 执行核弹级数据库清理：删除历史记录、提醒设置和药品本体
     await isar.writeTxn(() async {
-      // 删除关联的用药记录 (IntakeLog)
+      // 彻底删除该药的所有服药历史 (IntakeLog)
       await isar.intakeLogs
           .filter()
-          .medicineNameEqualTo(medicine.name)
+          .medicine((q) => q.idEqualTo(id))
           .deleteAll();
       
-      // 删除关联的提醒设置 (Reminder)
+      // 彻底删除关联的提醒规则 (Reminder)
       if (reminderIds.isNotEmpty) {
         await isar.reminders.deleteAll(reminderIds);
       }
       
-      // 最后删除药品本身
+      // 最后抹除药品对象
       await isar.medicines.delete(id);
     });
+
+    // 4. 停止前台服务（如果这是最后一项任务）
+    // 逻辑会自动在 HomeScreen 的 _loadTodayTasks 中触发，此处确保数据一致性即可
   }
 
   Future<void> _saveMedicineWithReminderTimes({
