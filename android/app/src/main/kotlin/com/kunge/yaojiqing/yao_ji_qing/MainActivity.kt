@@ -2,8 +2,10 @@ package com.kunge.yaojiqing
 
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import android.os.Bundle
+import android.content.ComponentName
 import android.content.Intent
 import android.content.Context
 import android.os.Build
@@ -13,6 +15,8 @@ import android.app.PendingIntent
 import androidx.core.app.NotificationManagerCompat
 
 class MainActivity: FlutterActivity() {
+    private var directAudioRecorder: DirectAudioRecorder? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         handleStopVibrationIntent(intent)
@@ -38,6 +42,16 @@ class MainActivity: FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        directAudioRecorder = DirectAudioRecorder(applicationContext)
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "yao_ji_qing/direct_audio"
+        ).setMethodCallHandler(directAudioRecorder)
+        EventChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "yao_ji_qing/direct_audio_stream"
+        ).setStreamHandler(directAudioRecorder)
 
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
@@ -167,20 +181,55 @@ class MainActivity: FlutterActivity() {
                     ))
                 }
                 "restartApp" -> {
-                    val intent = packageManager.getLaunchIntentForPackage(packageName)
+                    val componentName = ComponentName(applicationContext, MainActivity::class.java)
+                    val intent = Intent.makeRestartActivityTask(componentName).apply {
+                        setPackage(packageName)
+                        putExtra("restarted_after_model_download", true)
+                    }
                     val restartIntent = PendingIntent.getActivity(
                         applicationContext, 
-                        9999, 
+                        9999,
                         intent, 
-                        PendingIntent.FLAG_CANCEL_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
+                        PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
                     )
                     val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
-                    alarmManager.set(AlarmManager.RTC, System.currentTimeMillis() + 100, restartIntent)
-                    android.os.Process.killProcess(android.os.Process.myPid())
-                    System.exit(0)
+                    val restartAt = System.currentTimeMillis() + 1500
+                    when {
+                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms() -> {
+                            alarmManager.setAlarmClock(
+                                AlarmManager.AlarmClockInfo(restartAt, restartIntent),
+                                restartIntent
+                            )
+                        }
+                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.M -> {
+                            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, restartAt, restartIntent)
+                        }
+                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT -> {
+                            alarmManager.setExact(AlarmManager.RTC_WAKEUP, restartAt, restartIntent)
+                        }
+                        else -> {
+                            alarmManager.set(AlarmManager.RTC_WAKEUP, restartAt, restartIntent)
+                        }
+                    }
+                    result.success(true)
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                            finishAndRemoveTask()
+                        } else {
+                            finishAffinity()
+                        }
+                        android.os.Process.killProcess(android.os.Process.myPid())
+                        kotlin.system.exitProcess(0)
+                    }, 500)
                 }
                 else -> result.notImplemented()
             }
         }
+    }
+
+    override fun onDestroy() {
+        directAudioRecorder?.stop()
+        directAudioRecorder = null
+        super.onDestroy()
     }
 }

@@ -5,6 +5,7 @@ import '../services/gemini_service.dart';
 import '../services/database_service.dart';
 import 'package:background_downloader/background_downloader.dart';
 import '../widgets/scanner_result_editor.dart';
+import 'model_manager_screen.dart';
 
 class ScannerScreen extends StatefulWidget {
   final XFile? initialImage;
@@ -63,32 +64,39 @@ class _ScannerScreenState extends State<ScannerScreen> {
   }
 
   Future<void> _processImage(XFile image) async {
-    // 1. 检查模型状态
-    final isReady = await _geminiService.isModelReady();
-    if (!isReady) {
-      final hasFile = await _geminiService.isFilePresent(); 
-      setState(() {
-        _isDownloading = true;
-        _downloadProgress = hasFile ? 0.5 : 0.0;
-      });
-      try {
-        await _geminiService.downloadModel();
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("引擎初始化失败: $e")));
-        }
-        setState(() => _isDownloading = false);
-        return;
+    // 1. 强性模型校验
+    final isGemmaReady = await _geminiService.isModelReady();
+    if (!isGemmaReady) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text("AI 识别引擎尚未就绪"),
+            content: const Text("药品识别需在本地运行 AI 模型。是否现在前往模型管理页面进行下载安装？"),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text("取消")),
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const ModelManagerScreen()));
+                },
+                child: const Text("前往管理"),
+              ),
+            ],
+          ),
+        );
       }
       return; 
     }
 
     // 2. 正式识别
-    setState(() {
-      _isProcessing = true;
-      _streamingText = "";
-      _result = null;
-    });
+    if (mounted) {
+      setState(() {
+        _isProcessing = true;
+        _streamingText = "";
+        _result = null;
+      });
+    }
 
     final bytes = await image.readAsBytes();
     final info = await _geminiService.extractMedicationInfo(

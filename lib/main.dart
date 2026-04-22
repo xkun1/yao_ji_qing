@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:yao_ji_qing/services/gemini_service.dart';
 
 import 'services/database_service.dart';
 import 'services/notification_service.dart';
@@ -20,6 +21,9 @@ void main() async {
 
   final dbService = DatabaseService();
   await dbService.init();
+
+  // 加载 AI 设置
+  await GeminiService().loadSettings();
 
   runApp(const YaoJiQingApp());
 }

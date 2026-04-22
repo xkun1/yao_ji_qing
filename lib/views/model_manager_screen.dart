@@ -1,8 +1,10 @@
-import 'dart:io';
 import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
-import '../services/gemini_service.dart';
 import 'package:background_downloader/background_downloader.dart';
+
+import '../services/gemini_service.dart';
 
 class ModelManagerScreen extends StatefulWidget {
   const ModelManagerScreen({super.key});
@@ -13,20 +15,27 @@ class ModelManagerScreen extends StatefulWidget {
 
 class _ModelManagerScreenState extends State<ModelManagerScreen> {
   final GeminiService _aiService = GeminiService();
-  ModelState _state = ModelState.none;
-  bool _isDownloading = false;
-  double _progress = 0.0;
-  String _statusText = "正在检查状态...";
-  String _fileSizeText = "0 GB";
-  StreamSubscription? _downloadSubscription;
 
-  static const String _constModelSize = "2.41 GB";
+  bool _gemmaReady = false;
+  bool _asrReady = false;
+  bool _ttsReady = false;
+
+  String _gemmaSize = '检测中...';
+  String _asrSize = '检测中...';
+  String _ttsSize = '检测中...';
+
+  bool _isProcessing = false;
+  String? _downloadingType;
+  double _downloadProgress = 0;
+  String _downloadStatus = '';
+  StreamSubscription<TaskUpdate>? _downloadSubscription;
 
   @override
   void initState() {
     super.initState();
-    _checkStatus();
-    _listenToDownloads();
+    _listenDownloadProgress();
+    _restoreDownloadSnapshot();
+    _refreshStatus();
   }
 
   @override
@@ -35,245 +44,428 @@ class _ModelManagerScreenState extends State<ModelManagerScreen> {
     super.dispose();
   }
 
-  Future<void> _checkStatus() async {
-    final state = await _aiService.getModelState();
-    String sizeText = "0 GB";
-    
-    // 如果文件在磁盘上（不管是 ready 还是 fileDetected），都显示真实大小
-    if (state != ModelState.none) {
-      try {
-        final path = await _aiService.getModelPathForDeletion();
-        final file = File(path);
-        if (await file.exists()) {
-          final bytes = await file.length();
-          sizeText = "${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB";
-        } else {
-          sizeText = _constModelSize;
+  void _listenDownloadProgress() {
+    _downloadSubscription = _aiService.downloadUpdates.listen((update) {
+      if (!mounted || update is! TaskProgressUpdate) return;
+
+      final snapshot = _aiService.modelDownloadSnapshot;
+      if (!snapshot.isActive) return;
+
+      _applyDownloadSnapshot(snapshot);
+    });
+  }
+
+  void _restoreDownloadSnapshot() {
+    final snapshot = _aiService.modelDownloadSnapshot;
+    if (snapshot.isActive) {
+      _applyDownloadSnapshot(snapshot);
+      return;
+    }
+
+    unawaited(_restoreNativeActiveDownload());
+  }
+
+  void _applyDownloadSnapshot(ModelDownloadSnapshot snapshot) {
+    if (!mounted) return;
+    setState(() {
+      _isProcessing = true;
+      _downloadingType = snapshot.type;
+      _downloadProgress = snapshot.progress;
+      _downloadStatus = snapshot.status;
+    });
+  }
+
+  Future<void> _restoreNativeActiveDownload() async {
+    try {
+      final tasks = await FileDownloader().allTasks(allGroups: true);
+      if (!mounted) return;
+
+      for (final task in tasks) {
+        final snapshot = _aiService.downloadSnapshotForFilename(task.filename);
+        if (snapshot != null) {
+          _applyDownloadSnapshot(snapshot);
+          return;
         }
-      } catch (_) {
-        sizeText = _constModelSize;
+      }
+    } catch (_) {
+      // 后台任务查询失败不影响模型状态检测。
+    }
+  }
+
+  Future<void> _refreshStatus() async {
+    final gState = await _aiService.getModelState();
+    final gReady = gState == ModelState.ready;
+    final aReady = await _aiService.checkAsrFilesExist();
+    final tReady = await _aiService.checkTtsFilesExist();
+
+    String gSize = gState == ModelState.none
+        ? '未下载'
+        : await _getFileSize(await _aiService.getModelPathForDeletion());
+    String aSize = aReady
+        ? await _getDirSize(await _aiService.getAsrModelPathForDeletion())
+        : '未下载';
+
+    String tSize = '未下载';
+    if (tReady) {
+      final ttsPath = await _aiService.findTtsModelPath();
+      if (ttsPath != null) {
+        tSize = await _getDirSize(Directory(ttsPath).parent.path);
       }
     }
 
     if (mounted) {
       setState(() {
-        _state = state;
-        _fileSizeText = sizeText;
-        switch (state) {
-          case ModelState.ready:
-            _statusText = "引擎已就绪";
-            break;
-          case ModelState.fileDetected:
-            _statusText = "模型文件已检测到 (待初始化)";
-            break;
-          case ModelState.none:
-            _statusText = "未安装";
-            break;
-        }
+        _gemmaReady = gReady;
+        _asrReady = aReady;
+        _ttsReady = tReady;
+        _gemmaSize = gSize;
+        _asrSize = aSize;
+        _ttsSize = tSize;
       });
     }
   }
 
-  void _listenToDownloads() {
-    _downloadSubscription = _aiService.downloadUpdates.listen((update) {
-      if (!mounted) return;
-      if (update is TaskProgressUpdate) {
-        setState(() {
-          _isDownloading = true;
-          _progress = update.progress;
-          _statusText = "正在下载 AI 引擎...";
-        });
-      } else if (update is TaskStatusUpdate) {
-        if (update.status == TaskStatus.complete) {
-          _checkStatus();
-          setState(() => _isDownloading = false);
-        } else if (update.status == TaskStatus.failed || update.status == TaskStatus.canceled) {
-          setState(() => _isDownloading = false);
-          _checkStatus();
+  Future<String> _getFileSize(String path) async {
+    final file = File(path);
+    if (await file.exists()) {
+      final bytes = await file.length();
+      return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+    }
+    return '未下载';
+  }
+
+  Future<String> _getDirSize(String path) async {
+    final dir = Directory(path);
+    if (await dir.exists()) {
+      int totalSize = 0;
+      try {
+        await for (var file in dir.list(recursive: true, followLinks: false)) {
+          if (file is File) {
+            totalSize += await file.length();
+          }
         }
-      }
-    });
+      } catch (_) {}
+      return '${(totalSize / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    return '未下载';
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
-      appBar: AppBar(title: const Text("AI 引擎管理"), backgroundColor: Colors.white, elevation: 0),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildStatusCard(),
-            const SizedBox(height: 32),
-            const Text("关于 Gemma 4 引擎", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            const Text(
-              "这是 Google 开发的高性能端侧大语言模型。开启后，您的用药识别将在手机本地 100% 离线完成，确保极致的隐私与响应速度。",
-              style: TextStyle(color: Color(0xFF6B7280), fontSize: 14, height: 1.6),
+      appBar: AppBar(
+        title: const Text("模型管理"),
+        backgroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _buildModelCard(
+            title: "对话引擎 (Gemma 4)",
+            subtitle: "本地大语言模型，负责理解与回复",
+            size: _gemmaSize,
+            isReady: _gemmaReady,
+            isDownloading: _downloadingType == 'gemma',
+            downloadProgress: _downloadProgress,
+            downloadStatus: _downloadStatus,
+            icon: Icons.psychology_rounded,
+            color: const Color(0xFF3B82F6),
+            onDownload: () => _handleDownload('gemma'),
+            onDelete: () => _handleDelete('gemma'),
+          ),
+          const SizedBox(height: 16),
+          _buildModelCard(
+            title: "语音识别 (ASR)",
+            subtitle: "本地流式语音识别，负责听懂您的话",
+            size: _asrSize,
+            isReady: _asrReady,
+            isDownloading: _downloadingType == 'asr',
+            downloadProgress: _downloadProgress,
+            downloadStatus: _downloadStatus,
+            icon: Icons.mic_rounded,
+            color: const Color(0xFF8B5CF6),
+            onDownload: () => _handleDownload('asr'),
+            onDelete: () => _handleDelete('asr'),
+          ),
+          const SizedBox(height: 16),
+          _buildModelCard(
+            title: "语音合成 (TTS)",
+            subtitle: "本地甜美女声合成，负责为您播报",
+            size: _ttsSize,
+            isReady: _ttsReady,
+            isDownloading: _downloadingType == 'tts',
+            downloadProgress: _downloadProgress,
+            downloadStatus: _downloadStatus,
+            icon: Icons.record_voice_over_rounded,
+            color: const Color(0xFF10B981),
+            onDownload: () => _handleDownload('tts'),
+            onDelete: () => _handleDelete('tts'),
+          ),
+          const SizedBox(height: 32),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              "提示：删除模型后，对应的功能将暂时无法使用。建议在存储空间不足时再进行清理。",
+              style: TextStyle(
+                fontSize: 12,
+                color: Color(0xFF9CA3AF),
+                height: 1.5,
+              ),
+              textAlign: TextAlign.center,
             ),
-            const Spacer(),
-            _buildMainButton(),
-            const SizedBox(height: 24),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildMainButton() {
-    if (_isDownloading) {
-      return SizedBox(
-        width: double.infinity,
-        height: 56,
-        child: FilledButton(
-          onPressed: null,
-          style: FilledButton.styleFrom(disabledBackgroundColor: const Color(0xFFE5E7EB)),
-          child: const Text("正在处理中...", style: TextStyle(color: Colors.white)),
-        ),
-      );
-    }
-
-    if (_state == ModelState.ready) {
-      return SizedBox(
-        width: double.infinity,
-        height: 56,
-        child: OutlinedButton.icon(
-          onPressed: _handleDelete,
-          icon: const Icon(Icons.delete_sweep_rounded),
-          label: const Text("删除模型，释放空间"),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: const Color(0xFFEF4444),
-            side: const BorderSide(color: Color(0xFFFCA5A5)),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          ),
-        ),
-      );
-    }
-
-    if (_state == ModelState.fileDetected) {
-      return SizedBox(
-        width: double.infinity,
-        height: 56,
-        child: FilledButton.icon(
-          onPressed: () => _aiService.downloadModel(),
-          icon: const Icon(Icons.flash_on_rounded),
-          label: const Text("立即初始化本地模型"),
-          style: FilledButton.styleFrom(
-            backgroundColor: const Color(0xFFF59E0B), // 橙色醒目提示
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          ),
-        ),
-      );
-    }
-
-    return SizedBox(
-      width: double.infinity,
-      height: 56,
-      child: FilledButton.icon(
-        onPressed: () => _aiService.downloadModel(),
-        icon: const Icon(Icons.download_rounded),
-        label: const Text("立即安装 (2.41 GB)"),
-        style: FilledButton.styleFrom(
-          backgroundColor: const Color(0xFF3B82F6),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatusCard() {
-    Color statusColor = const Color(0xFF3B82F6);
-    IconData statusIcon = Icons.memory_rounded;
-    
-    if (_state == ModelState.ready) {
-      statusColor = const Color(0xFF10B981);
-      statusIcon = Icons.verified_rounded;
-    } else if (_state == ModelState.fileDetected) {
-      statusColor = const Color(0xFFF59E0B);
-      statusIcon = Icons.folder_shared_rounded;
-    }
-
+  Widget _buildModelCard({
+    required String title,
+    required String subtitle,
+    required String size,
+    required bool isReady,
+    required bool isDownloading,
+    required double downloadProgress,
+    required String downloadStatus,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onDownload,
+    required VoidCallback onDelete,
+  }) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10)],
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.1),
+                  color: color.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(statusIcon, color: statusColor),
+                child: Icon(icon, color: color, size: 28),
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text("引擎状态", style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 12)),
-                    Text(_statusText, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: statusColor)),
-                    if (_state != ModelState.none)
-                      Text("占用空间: $_fileSizeText", style: const TextStyle(color: Color(0xFF6B7280), fontSize: 12)),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1F2937),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF6B7280),
+                      ),
+                    ),
                   ],
                 ),
               ),
-              if (_state == ModelState.ready)
-                const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981))
             ],
           ),
-          if (_isDownloading) ...[
-            const SizedBox(height: 24),
+          const SizedBox(height: 20),
+          if (isDownloading) ...[
             ClipRRect(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(999),
               child: LinearProgressIndicator(
-                value: _progress >= 0 ? _progress : 0,
+                value: downloadProgress >= 0 ? downloadProgress : null,
                 minHeight: 8,
-                backgroundColor: const Color(0xFFF3F4F6),
-                color: const Color(0xFF3B82F6),
+                color: color,
+                backgroundColor: color.withValues(alpha: 0.12),
               ),
             ),
             const SizedBox(height: 8),
-            Text("${(_progress * 100).toStringAsFixed(1)}%", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-          ]
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  downloadStatus.isEmpty ? '正在下载安装...' : downloadStatus,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  downloadProgress >= 0
+                      ? '${(downloadProgress * 100).clamp(0, 100).toStringAsFixed(1)}%'
+                      : '准备中',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF6B7280),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+          ],
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "占用空间",
+                    style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    size,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF374151),
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  if (isReady)
+                    TextButton.icon(
+                      onPressed: _isProcessing ? null : onDelete,
+                      icon: const Icon(
+                        Icons.delete_outline_rounded,
+                        color: Color(0xFFEF4444),
+                      ),
+                      label: const Text(
+                        "删除",
+                        style: TextStyle(color: Color(0xFFEF4444)),
+                      ),
+                    )
+                  else
+                    FilledButton.icon(
+                      onPressed: _isProcessing ? null : onDownload,
+                      icon: Icon(
+                        isDownloading
+                            ? Icons.cloud_download_rounded
+                            : Icons.download_rounded,
+                        size: 18,
+                      ),
+                      label: Text(isDownloading ? "下载中" : "下载安装"),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: color,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Future<void> _handleDelete() async {
+  void _handleDownload(String type) async {
+    setState(() {
+      _isProcessing = true;
+      _downloadingType = type;
+      _downloadProgress = 0;
+      _downloadStatus = '正在准备下载...';
+    });
+    try {
+      if (type == 'gemma') {
+        await _aiService.downloadModel();
+      } else if (type == 'asr') {
+        await _aiService.downloadAsrModel();
+      } else if (type == 'tts') {
+        await _aiService.downloadTtsModel();
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("模型下载安装完成")),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("下载安装失败: $e"),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+          _downloadingType = null;
+          _downloadProgress = 0;
+          _downloadStatus = '';
+        });
+      }
+      _refreshStatus();
+    }
+  }
+
+  void _handleDelete(String type) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("释放空间？"),
-        content: const Text("确定要删除本地 AI 模型吗？删除后将无法使用拍照识药功能。"),
+        title: const Text("确认删除模型？"),
+        content: const Text("您确定要删除该模型文件吗？删除后相关功能将无法工作，且重新使用需再次下载。"),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("取消")),
-          FilledButton(
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("取消"),
+          ),
+          TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
-            child: const Text("确定删除"),
+            style:
+                TextButton.styleFrom(foregroundColor: const Color(0xFFEF4444)),
+            child: const Text("确认删除"),
           ),
         ],
       ),
     );
+
     if (confirmed == true) {
-      final path = await _aiService.getModelPathForDeletion();
-      final file = File(path);
-      if (await file.exists()) {
-        await file.delete();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("模型已删除，空间已释放")));
-          _checkStatus();
-        }
+      setState(() => _isProcessing = true);
+      if (type == 'gemma') {
+        final path = await _aiService.getModelPathForDeletion();
+        final file = File(path);
+        if (await file.exists()) await file.delete();
+      } else if (type == 'asr') {
+        await _aiService.deleteAsrModel();
+      } else if (type == 'tts') {
+        await _aiService.deleteTtsModel();
+      }
+
+      await _refreshStatus();
+      setState(() => _isProcessing = false);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("模型已彻底清理")),
+        );
       }
     }
   }
