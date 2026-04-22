@@ -94,13 +94,12 @@ class _ModelManagerScreenState extends State<ModelManagerScreen> {
 
   Future<void> _refreshStatus() async {
     final gState = await _aiService.getModelState();
-    final gReady = gState == ModelState.ready;
+    final gModelPath = await _aiService.findExistingModelPath();
+    final gReady = gState == ModelState.ready && gModelPath != null;
     final aReady = await _aiService.checkAsrFilesExist();
     final tReady = await _aiService.checkTtsFilesExist();
 
-    String gSize = gState == ModelState.none
-        ? '未下载'
-        : await _getFileSize(await _aiService.getModelPathForDeletion());
+    String gSize = gModelPath == null ? '未下载' : await _getFileSize(gModelPath);
     String aSize = aReady
         ? await _getDirSize(await _aiService.getAsrModelPathForDeletion())
         : '未下载';

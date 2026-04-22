@@ -158,40 +158,31 @@ class GeminiService {
 
   factory GeminiService() => _instance;
 
-  static const String _githubModelReleaseBaseUrl =
-      'https://github.com/xkun1/yao_ji_qing/releases/download/app-models-asr-tts-gemma4-20260422';
   static const String _hfMirrorModelBaseUrl =
       'https://hf-mirror.com/kun110/yao-ji-qing-models/resolve/main';
   static const String _huggingFaceModelBaseUrl =
       'https://huggingface.co/kun110/yao-ji-qing-models/resolve/main';
-  static const List<String> _modelReleaseBaseUrls = [
-    _hfMirrorModelBaseUrl,
-    _huggingFaceModelBaseUrl,
-    'https://gh-proxy.com/$_githubModelReleaseBaseUrl',
-    'https://ghproxy.net/$_githubModelReleaseBaseUrl',
-    _githubModelReleaseBaseUrl,
-  ];
 
   static const String _modelId = 'gemma-4-E2B-it.litertlm';
   static const int _minGemmaModelBytes = 2500000000;
-  static const String _modelArchiveId =
-      'gemma-4-E2B-it.litertlm-20260422.tar.gz';
-  static const List<String> _modelArchivePartIds = [
-    '$_modelArchiveId.part-aa',
-    '$_modelArchiveId.part-ab',
-  ];
+  static const String _hfMirrorGemmaModelUrl =
+      'https://hf-mirror.com/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/$_modelId';
+  static const String _huggingFaceGemmaModelUrl =
+      'https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/$_modelId';
 
   // ASR 模型相关 (Paraformer 流式)
   static const String _asrDirName =
       'sherpa-onnx-streaming-paraformer-bilingual-zh-en';
   static const String _asrArchiveId =
       'sherpa-onnx-streaming-paraformer-bilingual-zh-en-int8.tar.gz';
+  static const int _minAsrArchiveBytes = 200 * 1024 * 1024;
   static const int _minAsrEncoderBytes = 100 * 1024 * 1024;
   static const int _minAsrDecoderBytes = 40 * 1024 * 1024;
 
   // TTS 模型相关（Kokoro 中文甜美女声）
   static const String _ttsDirName = 'kokoro-int8-multi-lang-v1_1';
   static const String _ttsArchiveId = 'kokoro-int8-multi-lang-v1_1-tts.tar.gz';
+  static const int _minTtsArchiveBytes = 130 * 1024 * 1024;
   static const String _ttsModelId = 'model.int8.onnx';
   static const String _ttsVoicesId = 'voices.bin';
   static const String _ttsTokensId = 'tokens.txt';
@@ -332,9 +323,19 @@ class GeminiService {
   Future<void>? _initialization;
 
   List<String> _releaseAssetUrls(String filename) {
-    return _modelReleaseBaseUrls
-        .map((baseUrl) => '$baseUrl/$filename')
-        .toList();
+    return [
+      '$_hfMirrorModelBaseUrl/$filename',
+      '$_huggingFaceModelBaseUrl/$filename',
+    ];
+  }
+
+  List<String> _gemmaModelUrls() {
+    return [
+      '$_hfMirrorModelBaseUrl/$_modelId',
+      _hfMirrorGemmaModelUrl,
+      '$_huggingFaceModelBaseUrl/$_modelId',
+      _huggingFaceGemmaModelUrl,
+    ];
   }
 
   Future<void> ensureInitialized() {
@@ -576,6 +577,7 @@ class GeminiService {
         filename: _asrArchiveId,
         directory: 'models/asr',
         modelName: 'ASR 模型',
+        minBytes: _minAsrArchiveBytes,
       );
       _setModelDownloadStage('asr', 1, '正在解压语音识别模型');
       await _extractTarGz(
@@ -610,6 +612,7 @@ class GeminiService {
         filename: _ttsArchiveId,
         directory: 'models/tts',
         modelName: 'TTS 模型',
+        minBytes: _minTtsArchiveBytes,
       );
       _setModelDownloadStage('tts', 1, '正在解压语音合成模型');
       await _extractTarGz(
@@ -691,6 +694,11 @@ class GeminiService {
       final docsDir = await getApplicationDocumentsDirectory();
       final modelRoot = Directory('${docsDir.path}/models');
       await modelRoot.create(recursive: true);
+      final targetFile = File('${modelRoot.path}/$_modelId');
+      if (await targetFile.exists() &&
+          await targetFile.length() < _minGemmaModelBytes) {
+        await targetFile.delete();
+      }
 
       FileDownloader().configureNotification(
         running: const TaskNotification('正在下载 AI 引擎', '已完成 {progress}'),
@@ -698,31 +706,13 @@ class GeminiService {
         progressBar: true,
       );
 
-      for (var i = 0; i < _modelArchivePartIds.length; i++) {
-        await _downloadReleaseAsset(
-          urls: _releaseAssetUrls(_modelArchivePartIds[i]),
-          filename: _modelArchivePartIds[i],
-          directory: 'models',
-          modelName: 'Gemma4 模型分片 ${i + 1}',
-        );
-      }
-
-      final archiveFile = File('${modelRoot.path}/$_modelArchiveId');
-      _setModelDownloadStage('gemma', 1, '正在合并 Gemma4 模型');
-      await _mergeFiles(
-        _modelArchivePartIds
-            .map((fileName) => File('${modelRoot.path}/$fileName'))
-            .toList(),
-        archiveFile,
+      await _downloadReleaseAsset(
+        urls: _gemmaModelUrls(),
+        filename: _modelId,
+        directory: 'models',
+        modelName: 'Gemma4 模型',
+        minBytes: _minGemmaModelBytes,
       );
-      _setModelDownloadStage('gemma', 1, '正在解压 Gemma4 模型');
-      await _extractTarGz(archiveFile, modelRoot);
-      await _deleteFiles([
-        archiveFile,
-        ..._modelArchivePartIds.map(
-          (fileName) => File('${modelRoot.path}/$fileName'),
-        ),
-      ]);
       _setModelDownloadStage('gemma', 1, '下载完成，正在重启...');
       await _restartApp();
       _clearModelDownloadSnapshot();
@@ -737,49 +727,78 @@ class GeminiService {
     required String filename,
     required String directory,
     required String modelName,
+    required int minBytes,
   }) async {
     _setModelDownloadSnapshot(filename, 0);
     TaskStatusUpdate? lastResult;
     for (final url in urls) {
       debugPrint('正在启动$modelName下载: $url');
+      final task = _createModelDownloadTask(
+        url: url,
+        filename: filename,
+        directory: directory,
+      );
       final result = await FileDownloader().download(
-        DownloadTask(
-          url: url,
-          filename: filename,
-          directory: directory,
-          baseDirectory: BaseDirectory.applicationDocuments,
-          updates: Updates.statusAndProgress,
-          allowPause: true,
-        ),
+        task,
+        onStatus: (status) {
+          debugPrint('$modelName下载状态: $status');
+        },
         onProgress: (progress) {
           _setModelDownloadSnapshot(filename, progress);
-          _progressController.add(
-            TaskProgressUpdate(
-              DownloadTask(
-                url: url,
-                filename: filename,
-                directory: directory,
-                baseDirectory: BaseDirectory.applicationDocuments,
-                updates: Updates.statusAndProgress,
-                allowPause: true,
-              ),
-              progress,
-            ),
-          );
+          _progressController.add(TaskProgressUpdate(task, progress));
         },
       );
       if (result.status == TaskStatus.complete) {
+        final docsDir = await getApplicationDocumentsDirectory();
+        final file = File('${docsDir.path}/$directory/$filename');
+        if (!await file.exists() || await file.length() < minBytes) {
+          lastResult = result;
+          debugPrint('$modelName下载文件不完整，尝试备用地址: ${file.path}');
+          if (await file.exists()) await file.delete();
+          continue;
+        }
         _setModelDownloadSnapshot(filename, 1);
         return;
       }
       lastResult = result;
-      debugPrint('$modelName下载失败，尝试备用地址: ${result.status}');
+      debugPrint(
+        '$modelName下载失败，尝试备用地址: ${result.status}, ${result.exception}',
+      );
     }
 
     if (lastResult == null) {
       throw GeminiChatException('$modelName下载地址为空，请检查配置。');
     }
     _ensureDownloadComplete(lastResult, modelName);
+  }
+
+  DownloadTask _createModelDownloadTask({
+    required String url,
+    required String filename,
+    required String directory,
+  }) {
+    if (filename == _modelId) {
+      return ParallelDownloadTask(
+        url: url,
+        filename: filename,
+        directory: directory,
+        baseDirectory: BaseDirectory.applicationDocuments,
+        updates: Updates.statusAndProgress,
+        chunks: 16,
+        retries: 5,
+        allowPause: false,
+      );
+    }
+
+    return DownloadTask(
+      url: url,
+      filename: filename,
+      directory: directory,
+      baseDirectory: BaseDirectory.applicationDocuments,
+      updates: Updates.statusAndProgress,
+      retries: 3,
+      allowPause: true,
+    );
   }
 
   void _updateModelDownloadProgress(TaskProgressUpdate update) {
@@ -811,9 +830,9 @@ class GeminiService {
   }
 
   String? _modelDownloadTypeFromFilename(String filename) {
+    if (filename == _modelId) return 'gemma';
     if (filename == _asrArchiveId) return 'asr';
     if (filename == _ttsArchiveId) return 'tts';
-    if (filename.startsWith('$_modelArchiveId.part-')) return 'gemma';
     return null;
   }
 
@@ -823,25 +842,12 @@ class GeminiService {
     double progress,
   ) {
     if (progress < 0) return -1;
-    if (type != 'gemma') return progress.clamp(0, 1);
-
-    const partAaBytes = 1572864000.0;
-    const partAbBytes = 630091934.0;
-    const totalBytes = partAaBytes + partAbBytes;
-    if (filename.endsWith('.part-aa')) {
-      return (progress * partAaBytes / totalBytes).clamp(0, 1);
-    }
-    if (filename.endsWith('.part-ab')) {
-      return ((partAaBytes + progress * partAbBytes) / totalBytes).clamp(0, 1);
-    }
     return progress.clamp(0, 1);
   }
 
   String _modelDownloadStatusText(String type, String filename) {
     if (type == 'gemma') {
-      return filename.endsWith('.part-aa')
-          ? '正在下载 Gemma4 1/2'
-          : '正在下载 Gemma4 2/2';
+      return '正在下载 Gemma4 模型';
     }
     if (type == 'asr') return '正在下载语音识别模型';
     if (type == 'tts') return '正在下载语音合成模型';
@@ -854,23 +860,6 @@ class GeminiService {
       '$modelName下载失败，请检查网络后重试。',
       cause: result.exception ?? result.status,
     );
-  }
-
-  Future<void> _mergeFiles(List<File> parts, File outputFile) async {
-    if (await outputFile.exists()) {
-      await outputFile.delete();
-    }
-    final sink = outputFile.openWrite();
-    try {
-      for (final part in parts) {
-        if (!await part.exists()) {
-          throw GeminiChatException('Gemma4 模型分片缺失：${part.path}');
-        }
-        await sink.addStream(part.openRead());
-      }
-    } finally {
-      await sink.close();
-    }
   }
 
   Future<void> _extractTarGz(
