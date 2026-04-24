@@ -21,7 +21,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
   final DatabaseService _dbService = DatabaseService();
   final ImagePicker _picker = ImagePicker();
   final ScrollController _scrollController = ScrollController();
-  
+
   bool _isProcessing = false;
   bool _isDownloading = false;
   double _downloadProgress = 0.0;
@@ -56,7 +56,8 @@ class _ScannerScreenState extends State<ScannerScreen> {
       } else if (update is TaskStatusUpdate) {
         if (update.status == TaskStatus.complete) {
           setState(() => _isDownloading = false);
-        } else if (update.status == TaskStatus.failed || update.status == TaskStatus.canceled) {
+        } else if (update.status == TaskStatus.failed ||
+            update.status == TaskStatus.canceled) {
           setState(() => _isDownloading = false);
         }
       }
@@ -64,6 +65,17 @@ class _ScannerScreenState extends State<ScannerScreen> {
   }
 
   Future<void> _processImage(XFile image) async {
+    if (!_geminiService.supportsImageConsultation) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('当前 iPhone 本地 Gemma 4 仅支持文字咨询，暂不支持离线拍照识药。'),
+          ),
+        );
+      }
+      return;
+    }
+
     // 1. 强性模型校验
     final isGemmaReady = await _geminiService.isModelReady();
     if (!isGemmaReady) {
@@ -74,11 +86,16 @@ class _ScannerScreenState extends State<ScannerScreen> {
             title: const Text("AI 识别引擎尚未就绪"),
             content: const Text("药品识别需在本地运行 AI 模型。是否现在前往模型管理页面进行下载安装？"),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text("取消")),
+              TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("取消")),
               FilledButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const ModelManagerScreen()));
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const ModelManagerScreen()));
                 },
                 child: const Text("前往管理"),
               ),
@@ -86,7 +103,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
           ),
         );
       }
-      return; 
+      return;
     }
 
     // 2. 正式识别
@@ -162,11 +179,15 @@ class _ScannerScreenState extends State<ScannerScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.cloud_download_rounded, size: 64, color: Color(0xFF3B82F6)),
+          const Icon(Icons.cloud_download_rounded,
+              size: 64, color: Color(0xFF3B82F6)),
           const SizedBox(height: 24),
-          const Text("首次使用需初始化 AI 引擎", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const Text("首次使用需初始化 AI 引擎",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          const Text("正在下载本地大模型(约2.4GB)\n建议在 WiFi 环境下进行", textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: Color(0xFF6B7280))),
+          const Text("正在下载本地大模型(约2.4GB)\n建议在 WiFi 环境下进行",
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: Color(0xFF6B7280))),
           const SizedBox(height: 32),
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
@@ -178,7 +199,9 @@ class _ScannerScreenState extends State<ScannerScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          Text("${(_downloadProgress * 100).toStringAsFixed(1)}%", style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF3B82F6))),
+          Text("${(_downloadProgress * 100).toStringAsFixed(1)}%",
+              style: const TextStyle(
+                  fontWeight: FontWeight.bold, color: Color(0xFF3B82F6))),
         ],
       ),
     );
@@ -190,7 +213,8 @@ class _ScannerScreenState extends State<ScannerScreen> {
       children: [
         Icon(Icons.camera_alt, size: 80, color: Colors.blue[100]),
         const SizedBox(height: 24),
-        const Text("没有检测到图片", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const Text("没有检测到图片",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 40),
         ElevatedButton.icon(
           onPressed: () => _pickImage(ImageSource.camera),

@@ -47,7 +47,7 @@ class _ModelManagerScreenState extends State<ModelManagerScreen> {
 
   void _listenDownloadProgress() {
     _downloadSubscription = _aiService.downloadUpdates.listen((update) {
-      if (!mounted || update is! TaskProgressUpdate) return;
+      if (!mounted) return;
 
       final snapshot = _aiService.modelDownloadSnapshot;
       if (!snapshot.isActive) return;
@@ -94,35 +94,45 @@ class _ModelManagerScreenState extends State<ModelManagerScreen> {
   }
 
   Future<void> _refreshStatus() async {
-    final gState = await _aiService.getModelState();
-    final gModelPath = await _aiService.findExistingModelPath();
-    final gReady = gState == ModelState.ready && gModelPath != null;
-    final aReady = await _aiService.checkAsrFilesExist();
-    final tReady = await _aiService.checkTtsFilesExist();
+    try {
+      final gState = await _aiService.getModelState();
+      final gModelPath = await _aiService.findExistingModelPath();
+      final gReady = gState == ModelState.ready && gModelPath != null;
+      final aReady = await _aiService.checkAsrFilesExist();
+      final tReady = await _aiService.checkTtsFilesExist();
 
-    String gSize = gModelPath == null ? '未下载' : await _getFileSize(gModelPath);
-    String aSize = aReady
-        ? await _getDirSize(await _aiService.getAsrModelPathForDeletion())
-        : '未下载';
+      String gSize =
+          gModelPath == null ? '未下载' : await _getFileSize(gModelPath);
+      String aSize = aReady
+          ? await _getDirSize(await _aiService.getAsrModelPathForDeletion())
+          : '未下载';
 
-    String tSize = '未下载';
-    if (tReady) {
-      final ttsPath = await _aiService.findTtsModelPath();
-      if (ttsPath != null) {
-        tSize = await _getDirSize(Directory(ttsPath).parent.path);
+      String tSize = '未下载';
+      if (tReady) {
+        final ttsPath = await _aiService.findTtsModelPath();
+        if (ttsPath != null) {
+          tSize = await _getDirSize(Directory(ttsPath).parent.path);
+        }
       }
-    }
 
-    if (mounted) {
-      setState(() {
-        _gemmaReady = gReady;
-        _asrReady = aReady;
-        _ttsReady = tReady;
-        _gemmaSize = gSize;
-        _asrSize = aSize;
-        _ttsSize = tSize;
-        _initialLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _gemmaReady = gReady;
+          _asrReady = aReady;
+          _ttsReady = tReady;
+          _gemmaSize = gSize;
+          _asrSize = aSize;
+          _ttsSize = tSize;
+        });
+      }
+    } catch (e) {
+      debugPrint('刷新模型状态失败: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _initialLoading = false;
+        });
+      }
     }
   }
 
@@ -166,61 +176,61 @@ class _ModelManagerScreenState extends State<ModelManagerScreen> {
               padding: const EdgeInsets.all(16),
               children: [
                 _buildModelCard(
-            title: "对话引擎 (Gemma 4)",
-            subtitle: "本地大语言模型，负责理解与回复",
-            size: _gemmaSize,
-            isReady: _gemmaReady,
-            isDownloading: _downloadingType == 'gemma',
-            downloadProgress: _downloadProgress,
-            downloadStatus: _downloadStatus,
-            icon: Icons.psychology_rounded,
-            color: const Color(0xFF3B82F6),
-            onDownload: () => _handleDownload('gemma'),
-            onDelete: () => _handleDelete('gemma'),
-          ),
-          const SizedBox(height: 16),
-          _buildModelCard(
-            title: "语音识别 (ASR)",
-            subtitle: "本地流式语音识别，负责听懂您的话",
-            size: _asrSize,
-            isReady: _asrReady,
-            isDownloading: _downloadingType == 'asr',
-            downloadProgress: _downloadProgress,
-            downloadStatus: _downloadStatus,
-            icon: Icons.mic_rounded,
-            color: const Color(0xFF8B5CF6),
-            onDownload: () => _handleDownload('asr'),
-            onDelete: () => _handleDelete('asr'),
-          ),
-          const SizedBox(height: 16),
-          _buildModelCard(
-            title: "语音合成 (TTS)",
-            subtitle: "本地甜美女声合成，负责为您播报",
-            size: _ttsSize,
-            isReady: _ttsReady,
-            isDownloading: _downloadingType == 'tts',
-            downloadProgress: _downloadProgress,
-            downloadStatus: _downloadStatus,
-            icon: Icons.record_voice_over_rounded,
-            color: const Color(0xFF10B981),
-            onDownload: () => _handleDownload('tts'),
-            onDelete: () => _handleDelete('tts'),
-          ),
-          const SizedBox(height: 32),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Text(
-              "提示：删除模型后，对应的功能将暂时无法使用。建议在存储空间不足时再进行清理。",
-              style: TextStyle(
-                fontSize: 12,
-                color: Color(0xFF9CA3AF),
-                height: 1.5,
-              ),
-              textAlign: TextAlign.center,
+                  title: "对话引擎 (Gemma 4)",
+                  subtitle: "本地大语言模型，负责理解与回复",
+                  size: _gemmaSize,
+                  isReady: _gemmaReady,
+                  isDownloading: _downloadingType == 'gemma',
+                  downloadProgress: _downloadProgress,
+                  downloadStatus: _downloadStatus,
+                  icon: Icons.psychology_rounded,
+                  color: const Color(0xFF3B82F6),
+                  onDownload: () => _handleDownload('gemma'),
+                  onDelete: () => _handleDelete('gemma'),
+                ),
+                const SizedBox(height: 16),
+                _buildModelCard(
+                  title: "语音识别 (ASR)",
+                  subtitle: "本地流式语音识别，负责听懂您的话",
+                  size: _asrSize,
+                  isReady: _asrReady,
+                  isDownloading: _downloadingType == 'asr',
+                  downloadProgress: _downloadProgress,
+                  downloadStatus: _downloadStatus,
+                  icon: Icons.mic_rounded,
+                  color: const Color(0xFF8B5CF6),
+                  onDownload: () => _handleDownload('asr'),
+                  onDelete: () => _handleDelete('asr'),
+                ),
+                const SizedBox(height: 16),
+                _buildModelCard(
+                  title: "语音合成 (TTS)",
+                  subtitle: "本地甜美女声合成，负责为您播报",
+                  size: _ttsSize,
+                  isReady: _ttsReady,
+                  isDownloading: _downloadingType == 'tts',
+                  downloadProgress: _downloadProgress,
+                  downloadStatus: _downloadStatus,
+                  icon: Icons.record_voice_over_rounded,
+                  color: const Color(0xFF10B981),
+                  onDownload: () => _handleDownload('tts'),
+                  onDelete: () => _handleDelete('tts'),
+                ),
+                const SizedBox(height: 32),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    "提示：删除模型后，对应的功能将暂时无法使用。建议在存储空间不足时再进行清理。",
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF9CA3AF),
+                      height: 1.5,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -402,7 +412,7 @@ class _ModelManagerScreenState extends State<ModelManagerScreen> {
       } else if (type == 'tts') {
         await _aiService.downloadTtsModel();
       }
-      
+
       // 如果运行到这里还没有重启（虽然 service 内部可能已经触发），我们手动检查并提示
       if (mounted) {
         showDialog(
@@ -426,15 +436,15 @@ class _ModelManagerScreenState extends State<ModelManagerScreen> {
       }
     } catch (e) {
       if (mounted) {
-        String errorMsg = e.toString();
-        if (errorMsg.contains('iOS 调试模式限制')) {
-          // 针对 iOS Debug 的特殊处理
+        final errorMsg =
+            e is GeminiChatException ? e.userMessage : e.toString();
+        if (errorMsg.contains('安装完成') || errorMsg.contains('iOS 调试模式限制')) {
           showDialog(
             context: context,
             barrierDismissible: false,
             builder: (context) => AlertDialog(
               title: const Text("安装完成"),
-              content: Text(errorMsg.replaceAll('GeminiChatException: ', '')),
+              content: Text(errorMsg),
               actions: [
                 FilledButton(
                   onPressed: () => Navigator.pop(context),

@@ -26,8 +26,15 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 
 flutter_ios_podfile_setup
 
+pre_install do |installer|
+  Pod::Installer::Xcode::TargetValidator.send(
+    :define_method,
+    :verify_no_static_framework_transitive_dependencies,
+  ) {}
+end
+
 target 'Runner' do
-  use_frameworks! :linkage => :static
+  use_frameworks!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 end
@@ -35,5 +42,62 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.0'
+      config.build_settings['ONLY_ACTIVE_ARCH'] = 'YES'
+    end
+  end
+
+  genai_lib_dir = File.join(
+    __dir__,
+    'Pods',
+    'MediaPipeTasksGenAIC',
+    'frameworks',
+    'genai_libraries',
+  )
+  litert_force_dir = File.join(genai_lib_dir, 'litert_force_load')
+  FileUtils.mkdir_p(litert_force_dir)
+  force_device_archive = File.join(litert_force_dir, 'libLiteRTResourceCalculator_device.a')
+  force_sim_archive = File.join(litert_force_dir, 'libLiteRTResourceCalculator_simulator.a')
+  {
+    'libMediaPipeTasksGenAIC_device.a' => force_device_archive,
+    'libMediaPipeTasksGenAIC_simulator.a' => force_sim_archive,
+  }.each do |source_name, force_archive|
+    source_archive = File.join(genai_lib_dir, source_name)
+    extract_dir = Dir.mktmpdir('litert_resource_calculator')
+    begin
+      archive_for_extract = source_archive
+      if source_name.include?('simulator')
+        thin_archive = File.join(extract_dir, 'thin_simulator.a')
+        system('lipo', source_archive, '-thin', 'arm64', '-output', thin_archive) || raise('thin simulator archive failed')
+        archive_for_extract = thin_archive
+      end
+      Dir.chdir(extract_dir) do
+        system('ar', '-x', archive_for_extract, 'litert_resource_calculator.o') || raise('extract litert_resource_calculator.o failed')
+      end
+      object_path = File.join(extract_dir, 'litert_resource_calculator.o')
+      system('libtool', '-static', '-o', force_archive, object_path) || raise('build force archive failed')
+      system('ranlib', force_archive)
+    ensure
+      FileUtils.remove_entry(extract_dir)
+    end
+  end
+
+  pods_runner_config_dir = File.join(__dir__, 'Pods', 'Target Support Files', 'Pods-Runner')
+  Dir.glob(File.join(pods_runner_config_dir, 'Pods-Runner.*.xcconfig')).each do |config_path|
+    contents = File.readlines(config_path)
+    contents.reject! { |line| line.start_with?('OTHER_LDFLAGS[sdk=') }
+    contents.map! do |line|
+      if line.start_with?('OTHER_LDFLAGS =')
+        updated = line
+          .gsub(' -framework "MediaPipeTasksGenAI"', '')
+        updated
+      else
+        line
+      end
+    end
+    contents << "OTHER_LDFLAGS[sdk=iphoneos*] = $(inherited) -force_load \"#{force_device_archive}\"\n"
+    contents << "OTHER_LDFLAGS[sdk=iphonesimulator*] = $(inherited) -force_load \"#{force_sim_archive}\"\n"
+    File.write(config_path, contents.join)
   end
 end

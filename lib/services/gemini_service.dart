@@ -77,6 +77,18 @@ class ModelDownloadSnapshot {
   final String status;
 }
 
+class _ResolvedActiveModel {
+  const _ResolvedActiveModel({
+    required this.model,
+    required this.usesImageInput,
+    required this.backend,
+  });
+
+  final InferenceModel model;
+  final bool usesImageInput;
+  final PreferredBackend? backend;
+}
+
 class _ByteStreamReader {
   _ByteStreamReader(Stream<List<int>> stream)
       : _iterator = StreamIterator(stream);
@@ -162,9 +174,10 @@ class GeminiService {
       'https://hf-mirror.com/kun110/yao-ji-qing-models/resolve/main';
   static const String _huggingFaceModelBaseUrl =
       'https://huggingface.co/kun110/yao-ji-qing-models/resolve/main';
-
   static const String _modelId = 'gemma-4-E2B-it.litertlm';
   static const int _minGemmaModelBytes = 2500000000;
+  static const Duration _downloadProgressTimeout = Duration(seconds: 90);
+  static const Duration _downloadElapsedInterval = Duration(seconds: 10);
   static const String _hfMirrorGemmaModelUrl =
       'https://hf-mirror.com/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/$_modelId';
   static const String _huggingFaceGemmaModelUrl =
@@ -301,9 +314,13 @@ class GeminiService {
   final _progressController = StreamController<TaskUpdate>.broadcast();
   ModelDownloadSnapshot _modelDownloadSnapshot =
       const ModelDownloadSnapshot(isActive: false);
+  InferenceModel? _cachedInferenceModel;
+  PreferredBackend? _cachedInferenceModelBackend;
+  bool _cachedInferenceModelSupportsImage = false;
 
   Stream<TaskUpdate> get downloadUpdates => _progressController.stream;
   ModelDownloadSnapshot get modelDownloadSnapshot => _modelDownloadSnapshot;
+  bool get supportsImageConsultation => !Platform.isIOS;
 
   ModelDownloadSnapshot? downloadSnapshotForFilename(
     String filename, {
@@ -381,6 +398,8 @@ class GeminiService {
     FileDownloader().updates.listen((update) {
       if (update is TaskProgressUpdate) {
         _updateModelDownloadProgress(update);
+      } else if (update is TaskStatusUpdate) {
+        _updateModelDownloadStatus(update);
       }
       _progressController.add(update);
     });
@@ -403,9 +422,74 @@ class GeminiService {
         _cachedBackend = PreferredBackend.gpu;
       }
     } else {
-      _cachedBackend = PreferredBackend.gpu;
+      // iOS 端当前优先保守走 CPU，避免 GPU/MediaPipe 组合带来的初始化不稳定。
+      _cachedBackend = PreferredBackend.cpu;
     }
     return _cachedBackend!;
+  }
+
+  Future<_ResolvedActiveModel> _loadActiveModelWithFallback({
+    required int maxTokens,
+    required bool supportImage,
+  }) async {
+    final detectedBackend = await _detectBestBackend();
+    final attempts = <({PreferredBackend? backend, bool supportImage})>[
+      (backend: detectedBackend, supportImage: supportImage),
+      if (detectedBackend != PreferredBackend.cpu)
+        (backend: PreferredBackend.cpu, supportImage: supportImage),
+      if (supportImage) (backend: PreferredBackend.cpu, supportImage: false),
+    ];
+
+    Object? lastError;
+    for (final attempt in attempts) {
+      if (_cachedInferenceModel != null &&
+          _cachedInferenceModelBackend == attempt.backend &&
+          (!attempt.supportImage || _cachedInferenceModelSupportsImage)) {
+        return _ResolvedActiveModel(
+          model: _cachedInferenceModel!,
+          usesImageInput: attempt.supportImage,
+          backend: attempt.backend,
+        );
+      }
+
+      try {
+        final model = await activeModelGetter(
+          maxTokens: maxTokens,
+          preferredBackend: attempt.backend,
+          supportImage: attempt.supportImage,
+        );
+        await _disposeCachedInferenceModel();
+        _cachedInferenceModel = model;
+        _cachedInferenceModelBackend = attempt.backend;
+        _cachedInferenceModelSupportsImage = attempt.supportImage;
+        return _ResolvedActiveModel(
+          model: model,
+          usesImageInput: attempt.supportImage,
+          backend: attempt.backend,
+        );
+      } catch (error) {
+        lastError = error;
+        debugPrint(
+          '⚠️ [Gemma] 模型加载失败: backend=${attempt.backend}, '
+          'supportImage=${attempt.supportImage}, error=$error',
+        );
+      }
+    }
+
+    throw GeminiChatException(
+      _describeChatError(lastError ?? 'unknown error'),
+      cause: lastError,
+    );
+  }
+
+  Future<void> _disposeCachedInferenceModel() async {
+    final existingModel = _cachedInferenceModel;
+    _cachedInferenceModel = null;
+    _cachedInferenceModelBackend = null;
+    _cachedInferenceModelSupportsImage = false;
+    try {
+      await existingModel?.close();
+    } catch (_) {}
   }
 
   Future<String?> findExistingModelPath() async {
@@ -731,22 +815,56 @@ class GeminiService {
   }) async {
     _setModelDownloadSnapshot(filename, 0);
     TaskStatusUpdate? lastResult;
-    for (final url in urls) {
+    for (var index = 0; index < urls.length; index++) {
+      final url = urls[index];
+      final type = _modelDownloadTypeFromFilename(filename);
+      if (type != null) {
+        _setModelDownloadStage(
+          type,
+          -1,
+          '正在连接下载源 ${index + 1}/${urls.length}',
+        );
+      }
       debugPrint('正在启动$modelName下载: $url');
       final task = _createModelDownloadTask(
         url: url,
         filename: filename,
         directory: directory,
       );
+      var lastProgressAt = DateTime.now();
+      var lastProgress = -1.0;
+      var cancelRequested = false;
       final result = await FileDownloader().download(
         task,
         onStatus: (status) {
+          _updateModelDownloadStatus(TaskStatusUpdate(task, status));
+          _progressController.add(TaskStatusUpdate(task, status));
           debugPrint('$modelName下载状态: $status');
         },
         onProgress: (progress) {
+          if (progress >= 0 && progress > lastProgress + 0.0001) {
+            lastProgress = progress;
+            lastProgressAt = DateTime.now();
+          }
           _setModelDownloadSnapshot(filename, progress);
           _progressController.add(TaskProgressUpdate(task, progress));
         },
+        onElapsedTime: (_) {
+          if (cancelRequested) return;
+          final stalledFor = DateTime.now().difference(lastProgressAt);
+          if (stalledFor < _downloadProgressTimeout) return;
+
+          cancelRequested = true;
+          if (type != null) {
+            _setModelDownloadStage(
+              type,
+              lastProgress >= 0 ? lastProgress : -1,
+              '下载源无进度，正在切换备用源',
+            );
+          }
+          unawaited(FileDownloader().cancelTaskWithId(task.taskId));
+        },
+        elapsedTimeInterval: _downloadElapsedInterval,
       );
       if (result.status == TaskStatus.complete) {
         final docsDir = await getApplicationDocumentsDirectory();
@@ -777,32 +895,36 @@ class GeminiService {
     required String filename,
     required String directory,
   }) {
-    if (filename == _modelId) {
-      return ParallelDownloadTask(
-        url: url,
-        filename: filename,
-        directory: directory,
-        baseDirectory: BaseDirectory.applicationDocuments,
-        updates: Updates.statusAndProgress,
-        chunks: 16,
-        retries: 5,
-        allowPause: false,
-      );
-    }
-
-    return DownloadTask(
+    return ParallelDownloadTask(
       url: url,
       filename: filename,
       directory: directory,
       baseDirectory: BaseDirectory.applicationDocuments,
       updates: Updates.statusAndProgress,
-      retries: 3,
-      allowPause: true,
+      chunks: filename == _modelId ? 16 : 8,
+      retries: filename == _modelId ? 5 : 3,
+      allowPause: false,
     );
   }
 
   void _updateModelDownloadProgress(TaskProgressUpdate update) {
     _setModelDownloadSnapshot(update.task.filename, update.progress);
+  }
+
+  void _updateModelDownloadStatus(TaskStatusUpdate update) {
+    final type = _modelDownloadTypeFromFilename(update.task.filename);
+    if (type == null) return;
+
+    final currentProgress = _modelDownloadSnapshot.type == type
+        ? _modelDownloadSnapshot.progress
+        : -1.0;
+    final progress =
+        update.status == TaskStatus.complete ? 1.0 : currentProgress;
+    _setModelDownloadStage(
+      type,
+      progress,
+      _modelDownloadStatusTextForStatus(type, update.status),
+    );
   }
 
   void _setModelDownloadSnapshot(String filename, double progress) {
@@ -852,6 +974,26 @@ class GeminiService {
     if (type == 'asr') return '正在下载语音识别模型';
     if (type == 'tts') return '正在下载语音合成模型';
     return '正在下载安装';
+  }
+
+  String _modelDownloadStatusTextForStatus(String type, TaskStatus status) {
+    final modelName = switch (type) {
+      'gemma' => 'Gemma4 模型',
+      'asr' => '语音识别模型',
+      'tts' => '语音合成模型',
+      _ => '模型',
+    };
+
+    return switch (status) {
+      TaskStatus.enqueued => '已加入下载队列，等待系统开始',
+      TaskStatus.running => '正在下载$modelName',
+      TaskStatus.waitingToRetry => '网络波动，等待自动重试',
+      TaskStatus.paused => '下载已暂停',
+      TaskStatus.complete => '下载完成',
+      TaskStatus.notFound => '下载地址不存在',
+      TaskStatus.failed => '下载失败，正在尝试备用源',
+      TaskStatus.canceled => '下载源无响应，正在切换备用源',
+    };
   }
 
   void _ensureDownloadComplete(TaskStatusUpdate result, String modelName) {
@@ -985,29 +1127,21 @@ class GeminiService {
     InferenceModel? model;
     InferenceModelSession? session;
     try {
+      if (imageBytes != null && !supportsImageConsultation) {
+        throw GeminiChatException('当前 iPhone 本地模型仅支持文字咨询，请移除图片后再发送。');
+      }
       await ensureInitialized();
       await _ensureActiveModelInstalled();
-      final backend = await _detectBestBackend();
-
-      try {
-        model = await activeModelGetter(
-          maxTokens: 2048,
-          preferredBackend: backend,
-          supportImage: imageBytes != null,
-        );
-      } catch (e) {
-        debugPrint('多模态模型加载失败，尝试回退到纯文本模式: $e');
-        // 如果带图加载失败，尝试纯文本加载
-        model = await activeModelGetter(
-          maxTokens: 2048,
-          preferredBackend: backend,
-          supportImage: false,
-        );
-        // 如果是因为不支持图片，清空图片参数避免后续 Message.withImage 报错
+      final resolvedModel = await _loadActiveModelWithFallback(
+        maxTokens: 2048,
+        supportImage: imageBytes != null,
+      );
+      model = resolvedModel.model;
+      if (!resolvedModel.usesImageInput) {
         imageBytes = null;
       }
 
-      session = await model.createSession(temperature: 0.2, topK: 5);
+      session = await model.createSession(temperature: 0.1, topK: 1);
 
       final promptBuffer = StringBuffer();
       promptBuffer.writeln('你是一位严谨的执业药师。请参考背景与上下文，专业精炼地回答问题。');
@@ -1060,7 +1194,11 @@ class GeminiService {
     } catch (error) {
       throw GeminiChatException(_describeChatError(error), cause: error);
     } finally {
-      await _closeSessionAndModel(session: session, model: model);
+      await _closeSessionAndModel(
+        session: session,
+        model: model,
+        closeModel: false,
+      );
     }
   }
 
@@ -1092,6 +1230,10 @@ class GeminiService {
         message.contains('delegate')) {
       return '当前设备暂时无法稳定运行药师咨询，请稍后重试。';
     }
+    if (message.contains('litertresourcecalculator') ||
+        message.contains('validatedgraphconfig')) {
+      return '当前 iOS 推理引擎与模型不兼容，请在模型管理里重新安装当前设备支持的引擎。';
+    }
     return '本地药师暂时忙不过来，请稍后再试。';
   }
 
@@ -1100,19 +1242,13 @@ class GeminiService {
       if (Platform.isAndroid) {
         await _vibrationChannel.invokeMethod('restartApp');
       } else {
-        // iOS 逻辑
-        if (kDebugMode) {
-          // Debug 模式下如果 exit(0)，用户手动点击图标会触发 iOS 14+ 限制报错
-          // 抛出异常让 UI 层捕获并显示友好提示
-          throw GeminiChatException('iOS 调试模式限制：请在 Android Studio 中重新点击运行按钮以加载新模型。');
-        } else {
-          exit(0);
-        }
+        throw GeminiChatException(
+          '安装完成。iOS 不允许应用自行重启，请从多任务界面关闭药记清后重新打开。',
+        );
       }
     } catch (e) {
       if (e is GeminiChatException) rethrow;
       debugPrint('重启指令发送失败: $e');
-      if (!kDebugMode) exit(0);
     }
   }
 
@@ -1123,6 +1259,9 @@ class GeminiService {
     InferenceModel? model;
     InferenceModelSession? session;
     try {
+      if (!supportsImageConsultation) {
+        throw GeminiChatException('当前 iPhone 本地模型仅支持文字咨询，暂不支持离线拍照识药。');
+      }
       await ensureInitialized();
       debugPrint('🚀 [Gemma 4] 开始识别流程...');
 
@@ -1204,12 +1343,14 @@ class GeminiService {
 {"medicine_name":"...","dosage_per_time":"...","frequency_daily":3,"recommended_times":["08:00","12:00","18:00"],"precautions":"..."}
 ''';
 
-      final backend = await _detectBestBackend();
-      model = await activeModelGetter(
+      final resolvedModel = await _loadActiveModelWithFallback(
         maxTokens: 2048,
-        preferredBackend: backend,
         supportImage: true,
       );
+      model = resolvedModel.model;
+      if (!resolvedModel.usesImageInput) {
+        throw GeminiChatException('当前设备暂时无法稳定处理图片咨询，请先使用文字咨询。');
+      }
       session = await model.createSession(temperature: 0.1, topK: 1);
 
       await session.addQueryChunk(
@@ -1234,20 +1375,27 @@ class GeminiService {
       debugPrint('识别异常: $e');
       return null;
     } finally {
-      await _closeSessionAndModel(session: session, model: model);
+      await _closeSessionAndModel(
+        session: session,
+        model: model,
+        closeModel: false,
+      );
     }
   }
 
   Future<void> _closeSessionAndModel({
     InferenceModelSession? session,
     InferenceModel? model,
+    bool closeModel = true,
   }) async {
     try {
       await session?.close();
     } catch (_) {}
-    try {
-      await model?.close();
-    } catch (_) {}
+    if (closeModel) {
+      try {
+        await model?.close();
+      } catch (_) {}
+    }
   }
 
   Future<String> getModelPathForDeletion() async {
@@ -1258,6 +1406,7 @@ class GeminiService {
   }
 
   void dispose() {
+    unawaited(_disposeCachedInferenceModel());
     _progressController.close();
   }
 

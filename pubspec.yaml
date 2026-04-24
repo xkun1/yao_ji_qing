@@ -19,7 +19,7 @@ dependencies:
 
   # AI & 网络
   google_generative_ai: ^0.4.0
-  flutter_gemma: ^0.13.3
+  flutter_gemma: ^0.13.6
   background_downloader: ^9.5.4
   dio: ^5.4.1
   http: ^1.2.1
@@ -41,6 +41,7 @@ dependencies:
   permission_handler: ^12.0.1
   sherpa_onnx: ^1.12.39
   audioplayers: ^6.6.0
+  provider: ^6.1.5+1
 
 dev_dependencies:
   flutter_test:
