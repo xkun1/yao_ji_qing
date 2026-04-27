@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -12,8 +14,10 @@ class AppConstants {
   static const int minGemmaModelBytes = 2500000000; // 2.5GB
 
   /// ASR 模型相关
-  static const String asrDirName = 'sherpa-onnx-streaming-paraformer-bilingual-zh-en';
-  static const String asrArchiveId = 'sherpa-onnx-streaming-paraformer-bilingual-zh-en-int8.tar.gz';
+  static const String asrDirName =
+      'sherpa-onnx-streaming-paraformer-bilingual-zh-en';
+  static const String asrArchiveId =
+      'sherpa-onnx-streaming-paraformer-bilingual-zh-en-int8.tar.gz';
   static const int minAsrArchiveBytes = 200 * 1024 * 1024; // 200MB
   static const int minAsrEncoderBytes = 100 * 1024 * 1024; // 100MB
   static const int minAsrDecoderBytes = 40 * 1024 * 1024; // 40MB
@@ -52,17 +56,21 @@ class AppConstants {
   // ==================== 网络相关常量 ====================
 
   /// HuggingFace 镜像地址
-  static const String hfMirrorBaseUrl = 'https://hf-mirror.com/kun110/yao-ji-qing-models/resolve/main';
-  static const String huggingFaceBaseUrl = 'https://huggingface.co/kun110/yao-ji-qing-models/resolve/main';
-  static const String hfMirrorGemmaUrl = 'https://hf-mirror.com/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/$gemmaModelId';
-  static const String huggingFaceGemmaUrl = 'https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/$gemmaModelId';
+  static const String hfMirrorBaseUrl =
+      'https://hf-mirror.com/kun110/yao-ji-qing-models/resolve/main';
+  static const String huggingFaceBaseUrl =
+      'https://huggingface.co/kun110/yao-ji-qing-models/resolve/main';
+  static const String hfMirrorGemmaUrl =
+      'https://hf-mirror.com/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/$gemmaModelId';
+  static const String huggingFaceGemmaUrl =
+      'https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/$gemmaModelId';
 
   // ==================== AI 相关常量 ====================
 
   /// 对话参数
-  static const double chatTemperature = 0.1;
-  static const int chatTopK = 1;
-  static const int chatMaxTokens = 2048;
+  static const double chatTemperature = 0.7;
+  static const int chatTopK = 40;
+  static int chatMaxTokens = Platform.isAndroid ? 2048 : 1024;
 
   /// TTS 参数
   static const double ttsLengthScale = 1.15; // 语速调节
@@ -136,7 +144,8 @@ class AppConstants {
 
   /// iOS 限制
   static const bool iosSupportsImageConsultation = false;
-  static const String iosRestartMessage = '安装完成。iOS 不允许应用自行重启，请从多任务界面关闭药记清后重新打开。';
+  static const String iosRestartMessage =
+      '安装完成。iOS 不允许应用自行重启，请从多任务界面关闭药记清后重新打开。';
 
   /// Android 最小 SDK
   static const int androidMinSdk = 21;
@@ -144,6 +153,8 @@ class AppConstants {
   // ==================== 调试相关常量 ====================
 
   static bool get isDebugMode => kDebugMode;
+
   static bool get isProfileMode => kProfileMode;
+
   static bool get isReleaseMode => kReleaseMode;
 }

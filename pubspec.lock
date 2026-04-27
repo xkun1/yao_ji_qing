@@ -457,10 +457,9 @@ packages:
   flutter_gemma:
     dependency: "direct main"
     description:
-      name: flutter_gemma
-      sha256: "72485d8a319bb4c0c00262b1c0e901eb0f0a6f61db5cae7ebfc80e3b5983567a"
-      url: "https://pub.flutter-io.cn"
-    source: hosted
+      path: "third_party/flutter_gemma"
+      relative: true
+    source: path
     version: "0.13.6"
   flutter_launcher_icons:
     dependency: "direct dev"

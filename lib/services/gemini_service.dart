@@ -12,6 +12,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 
+import '../core/constants.dart';
+
 enum ModelState { ready, fileDetected, none, checking }
 
 typedef ActiveModelGetter = Future<InferenceModel> Function({
@@ -422,7 +424,7 @@ class GeminiService {
         _cachedBackend = PreferredBackend.gpu;
       }
     } else {
-      // iOS 端当前优先保守走 CPU，避免 GPU/MediaPipe 组合带来的初始化不稳定。
+      // iOS 端 GPU 加速会因 2.5GB 模型导致内存 OOM 闪退，因此必须强行回退到 CPU 保证能跑。
       _cachedBackend = PreferredBackend.cpu;
     }
     return _cachedBackend!;
@@ -1133,7 +1135,7 @@ class GeminiService {
       await ensureInitialized();
       await _ensureActiveModelInstalled();
       final resolvedModel = await _loadActiveModelWithFallback(
-        maxTokens: 2048,
+        maxTokens: AppConstants.chatMaxTokens,
         supportImage: imageBytes != null,
       );
       model = resolvedModel.model;
@@ -1141,7 +1143,10 @@ class GeminiService {
         imageBytes = null;
       }
 
-      session = await model.createSession(temperature: 0.1, topK: 1);
+      session = await model.createSession(
+        temperature: AppConstants.chatTemperature,
+        topK: AppConstants.chatTopK,
+      );
 
       final promptBuffer = StringBuffer();
       promptBuffer.writeln('你是一位严谨的执业药师。请参考背景与上下文，专业精炼地回答问题。');
@@ -1344,14 +1349,17 @@ class GeminiService {
 ''';
 
       final resolvedModel = await _loadActiveModelWithFallback(
-        maxTokens: 2048,
+        maxTokens: AppConstants.chatMaxTokens,
         supportImage: true,
       );
       model = resolvedModel.model;
       if (!resolvedModel.usesImageInput) {
         throw GeminiChatException('当前设备暂时无法稳定处理图片咨询，请先使用文字咨询。');
       }
-      session = await model.createSession(temperature: 0.1, topK: 1);
+      session = await model.createSession(
+        temperature: AppConstants.chatTemperature,
+        topK: AppConstants.chatTopK,
+      );
 
       await session.addQueryChunk(
         Message.withImage(text: prompt, imageBytes: imageBytes, isUser: true),
