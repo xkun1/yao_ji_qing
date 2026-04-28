@@ -47,3 +47,10 @@ app.*.map.json
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# Build logs and temporary files
+build_log*.txt
+flags.txt
+isar_linker_flags.txt
+isar_symbols.txt
+
