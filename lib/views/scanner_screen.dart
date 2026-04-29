@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import '../services/gemini_service.dart';
 import '../services/database_service.dart';
 import 'package:background_downloader/background_downloader.dart';
@@ -65,17 +66,6 @@ class _ScannerScreenState extends State<ScannerScreen> {
   }
 
   Future<void> _processImage(XFile image) async {
-    if (!_geminiService.supportsImageConsultation) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('当前 iPhone 本地 Gemma 4 仅支持文字咨询，暂不支持离线拍照识药。'),
-          ),
-        );
-      }
-      return;
-    }
-
     // 1. 强性模型校验
     final isGemmaReady = await _geminiService.isModelReady();
     if (!isGemmaReady) {
@@ -110,14 +100,43 @@ class _ScannerScreenState extends State<ScannerScreen> {
     if (mounted) {
       setState(() {
         _isProcessing = true;
-        _streamingText = "";
+        _streamingText = "正在进行图文识别 (OCR)...";
         _result = null;
       });
     }
 
-    final bytes = await image.readAsBytes();
+    final InputImage inputImage = InputImage.fromFilePath(image.path);
+    final textRecognizer = TextRecognizer(script: TextRecognitionScript.chinese);
+    String extractedText = "";
+    try {
+      final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
+      extractedText = recognizedText.text;
+    } catch (e) {
+      debugPrint("OCR Error: $e");
+    } finally {
+      textRecognizer.close();
+    }
+
+    if (extractedText.trim().isEmpty) {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("未能从图片中提取到有效文字，请确保医嘱清晰可见。")),
+        );
+      }
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _streamingText = "正在唤醒智慧药师提取核心信息...\n\n识别到的内容摘要：\n${extractedText.length > 50 ? '${extractedText.substring(0, 50)}...' : extractedText}\n\n正在分析...";
+      });
+    }
+
     final info = await _geminiService.extractMedicationInfo(
-      bytes,
+      extractedText,
       onStream: (text) {
         if (mounted) {
           setState(() => _streamingText = text);

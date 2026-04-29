@@ -308,6 +308,7 @@ class GeminiService {
       maxTokens: maxTokens,
       preferredBackend: preferredBackend,
       supportImage: supportImage,
+      maxNumImages: supportImage ? 1 : null,
     );
   };
 
@@ -322,7 +323,8 @@ class GeminiService {
 
   Stream<TaskUpdate> get downloadUpdates => _progressController.stream;
   ModelDownloadSnapshot get modelDownloadSnapshot => _modelDownloadSnapshot;
-  bool get supportsImageConsultation => !Platform.isIOS;
+  bool get supportsImageConsultation => true;
+  bool get supportsNativeImageConsultation => !Platform.isIOS;
 
   ModelDownloadSnapshot? downloadSnapshotForFilename(
     String filename, {
@@ -392,6 +394,7 @@ class GeminiService {
         maxTokens: maxTokens,
         preferredBackend: preferredBackend,
         supportImage: supportImage,
+        maxNumImages: supportImage ? 1 : null,
       );
     };
   }
@@ -424,8 +427,9 @@ class GeminiService {
         _cachedBackend = PreferredBackend.gpu;
       }
     } else {
-      // iOS 端 GPU 加速会因 2.5GB 模型导致内存 OOM 闪退，因此必须强行回退到 CPU 保证能跑。
-      _cachedBackend = PreferredBackend.cpu;
+      // flutter_gemma 0.14.0 现已支持 iOS Metal GPU 加速
+      // 注意：如果是 iOS 模拟器，GPU 分配会受限，但这由插件内部或开发者在真机测试时处理。
+      _cachedBackend = PreferredBackend.gpu;
     }
     return _cachedBackend!;
   }
@@ -439,7 +443,6 @@ class GeminiService {
       (backend: detectedBackend, supportImage: supportImage),
       if (detectedBackend != PreferredBackend.cpu)
         (backend: PreferredBackend.cpu, supportImage: supportImage),
-      if (supportImage) (backend: PreferredBackend.cpu, supportImage: false),
     ];
 
     Object? lastError;
@@ -455,6 +458,10 @@ class GeminiService {
       }
 
       try {
+        await _disposeModelBeforeReloadIfNeeded(
+          backend: attempt.backend,
+          supportImage: attempt.supportImage,
+        );
         final model = await activeModelGetter(
           maxTokens: maxTokens,
           preferredBackend: attempt.backend,
@@ -482,6 +489,22 @@ class GeminiService {
       _describeChatError(lastError ?? 'unknown error'),
       cause: lastError,
     );
+  }
+
+  Future<void> _disposeModelBeforeReloadIfNeeded({
+    required PreferredBackend? backend,
+    required bool supportImage,
+  }) async {
+    if (_cachedInferenceModel != null) {
+      await _disposeCachedInferenceModel();
+      return;
+    }
+
+    if (supportImage || backend != _cachedInferenceModelBackend) {
+      try {
+        await FlutterGemmaPlugin.instance.initializedModel?.close();
+      } catch (_) {}
+    }
   }
 
   Future<void> _disposeCachedInferenceModel() async {
@@ -1129,11 +1152,11 @@ class GeminiService {
     InferenceModel? model;
     InferenceModelSession? session;
     try {
-      if (imageBytes != null && !supportsImageConsultation) {
-        throw GeminiChatException('当前 iPhone 本地模型仅支持文字咨询，请移除图片后再发送。');
-      }
       await ensureInitialized();
       await _ensureActiveModelInstalled();
+      if (imageBytes != null && !supportsNativeImageConsultation) {
+        imageBytes = null;
+      }
       final resolvedModel = await _loadActiveModelWithFallback(
         maxTokens: AppConstants.chatMaxTokens,
         supportImage: imageBytes != null,
@@ -1146,6 +1169,7 @@ class GeminiService {
       session = await model.createSession(
         temperature: AppConstants.chatTemperature,
         topK: AppConstants.chatTopK,
+        enableVisionModality: imageBytes != null,
       );
 
       final promptBuffer = StringBuffer();
@@ -1197,6 +1221,7 @@ class GeminiService {
     } on GeminiChatException {
       rethrow;
     } catch (error) {
+      debugPrint('多模态聊天崩溃: $error');
       throw GeminiChatException(_describeChatError(error), cause: error);
     } finally {
       await _closeSessionAndModel(
@@ -1258,111 +1283,86 @@ class GeminiService {
   }
 
   Future<MedicationInfo?> extractMedicationInfo(
-    Uint8List imageBytes, {
+    String ocrText, {
     Function(String)? onStream,
   }) async {
     InferenceModel? model;
     InferenceModelSession? session;
     try {
-      if (!supportsImageConsultation) {
-        throw GeminiChatException('当前 iPhone 本地模型仅支持文字咨询，暂不支持离线拍照识药。');
-      }
       await ensureInitialized();
       debugPrint('🚀 [Gemma 4] 开始识别流程...');
 
       await _ensureActiveModelInstalled();
 
-      const String prompt = '''
-      你是一位执业药师，擅长从药盒标签或医嘱图片中提取用药信息。**所有输出必须为中文。**
+      final String prompt = '''
+      你是一位执业药师，擅长从散乱的 OCR (光学字符识别) 提取文字中，精准还原并整理出用药信息。**所有输出必须为中文。**
 
 ## 任务
-仅根据图片中**清晰可见的文字信息**提取用药信息，输出严格符合格式要求的 JSON。
+仅根据以下提供的【OCR识别文本】提取用药信息，输出严格符合格式要求的 JSON。
+
+【OCR识别文本】
+$ocrText
 
 ---
 
-## 强约束（必须遵守）
+## 核心规则（必须遵守）
 
-- **严禁推测、补全或基于常识猜测**
-- **仅允许提取图片中明确出现的信息**
-- 信息不完整或不确定时，必须使用：
-  - 字符串字段 → null 或 ""（按规则）
-  - 数值字段 → nul
-- 不得根据药名推断剂量、频次或注意事项
-- 不得生成图片中未出现的任何内容
+由于 OCR 提取的文本往往存在断行、排版错乱、甚至轻微错别字，请遵循以下容错原则：
+1. **上下文拼接**：如果遇到如“每片含钙600毫克”和“每日1-2片”分布在不同行，请自动将其关联。
+2. **合理推断与修正**：允许对明显的 OCR 识别错误进行常识性纠正（如“每日1~2片”等同于频率和剂量）。如果不确定剂量，请结合通用的药学常识与文中数字进行合理补全（例如看到“30片/瓶”，剂量单位通常为“片”）。
+3. **信息提取宽松度**：
+   - 药品名称：如果全称断成了两行（如“钙尔奇”、“碳酸钙D3片”），请智能拼接为“钙尔奇碳酸钙D3片”。
+   - 频率：如果没有写“每日几次”，但写了“每日1-2片”，请推断为 frequency_daily: 1 （代表一天一次，一次一到两片）或保留最稳妥的建议。
+4. 信息不完整或不确定时，依然使用：
+   - 字符串字段 → null 或 ""（按规则）
+   - 数值字段 → nul
 
 ---
 
 ## 字段规则
 
-- **medicine_name**:  
-  药品通用名（非商品名）。  
-  - 必须来自图片原文  
-  - 若仅能识别部分，保留并在末尾加“?”  
-  - 无法识别时输出 null  
-
-- **dosage_per_time**:  
-  单次剂量（必须包含单位，如“1片”、“2粒”、“5ml”）。  
-  - 仅提取图片中明确剂量  
-  - 无法识别时输出 null  
-
-- **frequency_daily**:  
-  每日服药次数，按以下规则转换：  
-  - QD / 每日一次 → 1  
-  - BID / 每日两次 → 2  
-  - TID / 每日三次 → 3  
-  - QID / 每日四次 → 4  
-  - Q8H → 3  
-  - Q6H → 4  
-  - 必须有明确标注才可转换  
-  - 否则输出 null  
-
-- **recommended_times**:  
-  - 仅当 frequency_daily 有值时才生成  
-  - 按固定规则映射（不得推断）：  
+- **medicine_name**: 药品名称（尽量拼接完整的商品名+通用名）。 
+- **dosage_per_time**: 单次剂量（必须包含单位，如“1片”、“2粒”、“5ml”）。如果没有写每次多少，但写了“每日1~2片”，则可以提取为“1-2片”。
+- **frequency_daily**: 每日服药次数（纯数字，如1, 2, 3）。如果没有明确写每日几次，默认保守设定为 1。
+- **recommended_times**: 
+  - 仅当 frequency_daily 有值时生成，按固定规则映射：  
     - 1 → ["08:00"]  
     - 2 → ["08:00","18:00"]  
     - 3 → ["08:00","12:00","18:00"]  
     - 4 → ["08:00","12:00","16:00","20:00"]  
-  - frequency_daily 为 null 时输出 []  
-
-- **precautions**:  
-  仅提取图片中明确出现的注意事项，按顺序拼接：  
-  ① 服用时机  
-  ② 禁忌  
-  ③ 储存条件  
-  ④ 副作用  
-  - 多条用“；”分隔  
-  - 不得补充常识性内容  
-  - 无相关信息时输出 ""  
+- **precautions**: 提取文中的警告、注意事项等。如果无则输出 ""。
 
 ---
 
 ## 输出要求
-
-- 仅输出 JSON  
-- 不得包含任何解释、说明 or 多余文本  
-- 所有字段必须存在  
+- 仅输出 JSON，绝对不得包含任何解释或 markdown 标记块 (```json) 
+- 所有字段必须存在
+- **必须使用多行缩进格式（Pretty Print）输出 JSON，保证美观易读。**
 
 输出格式如下：
-
-{"medicine_name":"...","dosage_per_time":"...","frequency_daily":3,"recommended_times":["08:00","12:00","18:00"],"precautions":"..."}
+{
+  "medicine_name": "...",
+  "dosage_per_time": "...",
+  "frequency_daily": 1,
+  "recommended_times": [
+    "08:00"
+  ],
+  "precautions": "..."
+}
 ''';
 
       final resolvedModel = await _loadActiveModelWithFallback(
         maxTokens: AppConstants.chatMaxTokens,
-        supportImage: true,
+        supportImage: false,
       );
       model = resolvedModel.model;
-      if (!resolvedModel.usesImageInput) {
-        throw GeminiChatException('当前设备暂时无法稳定处理图片咨询，请先使用文字咨询。');
-      }
       session = await model.createSession(
         temperature: AppConstants.chatTemperature,
         topK: AppConstants.chatTopK,
       );
 
       await session.addQueryChunk(
-        Message.withImage(text: prompt, imageBytes: imageBytes, isUser: true),
+        Message(text: prompt, isUser: true),
       );
 
       final responseStream = session.getResponseAsync();
@@ -1411,6 +1411,10 @@ class GeminiService {
     if (path != null) return path;
     final directory = await getApplicationDocumentsDirectory();
     return '${directory.path}/$_modelId';
+  }
+
+  Future<void> releaseCachedInferenceModel() async {
+    await _disposeCachedInferenceModel();
   }
 
   void dispose() {

@@ -36,6 +36,9 @@ end
 target 'Runner' do
   use_frameworks! :linkage => :static
 
+  # 引入 Google ML Kit 中文识别模型依赖，解决 iOS 无法识别中文的问题
+  pod 'GoogleMLKit/TextRecognitionChinese'
+
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 end
 
@@ -48,75 +51,42 @@ post_install do |installer|
     end
   end
 
-  has_flutter_gemma = installer.pod_targets.any? { |target| target.name == 'flutter_gemma' }
-  genai_lib_dir = File.join(
-    __dir__,
-    'Pods',
-    'MediaPipeTasksGenAIC',
-    'frameworks',
-    'genai_libraries',
-  )
-  next unless has_flutter_gemma && Dir.exist?(genai_lib_dir)
-
-  litert_force_dir = File.join(genai_lib_dir, 'litert_force_load')
-  FileUtils.mkdir_p(litert_force_dir)
-  force_device_archive = File.join(litert_force_dir, 'libLiteRTResourceCalculator_device.a')
-  force_sim_archive = File.join(litert_force_dir, 'libLiteRTResourceCalculator_simulator.a')
-  force_load_objects = [
-    'litert_resource_calculator.o',
-    'llm_executor_calculator.o',
-    'tokenizer_calculator.o',
-    'prompt_id_preprocessor_calculator.o',
-    'transformer_input_pack_calculator.o',
-    'auto_regressive_lm_controller_calculator.o',
-    'detokenizer_calculator.o',
-    'response_collector_calculator.o',
-    'default_input_stream_handler.o',
-    'immediate_input_stream_handler.o',
-    'in_order_output_stream_handler.o',
-  ]
-  {
-    'libMediaPipeTasksGenAIC_device.a' => force_device_archive,
-    'libMediaPipeTasksGenAIC_simulator.a' => force_sim_archive,
-  }.each do |source_name, force_archive|
-    source_archive = File.join(genai_lib_dir, source_name)
-    extract_dir = Dir.mktmpdir('litert_resource_calculator')
-    begin
-      archive_for_extract = source_archive
-      if source_name.include?('simulator')
-        thin_archive = File.join(extract_dir, 'thin_simulator.a')
-        system('lipo', source_archive, '-thin', 'arm64', '-output', thin_archive) || raise('thin simulator archive failed')
-        archive_for_extract = thin_archive
-      end
-      Dir.chdir(extract_dir) do
-        force_load_objects.each do |object_name|
-          system('ar', '-x', archive_for_extract, object_name) || raise("extract #{object_name} failed")
-        end
-      end
-      object_paths = force_load_objects.map { |object_name| File.join(extract_dir, object_name) }
-      system('libtool', '-static', '-o', force_archive, *object_paths) || raise('build force archive failed')
-      system('ranlib', force_archive)
-    ensure
-      FileUtils.remove_entry(extract_dir)
-    end
-  end
 
   pods_runner_config_dir = File.join(__dir__, 'Pods', 'Target Support Files', 'Pods-Runner')
   Dir.glob(File.join(pods_runner_config_dir, 'Pods-Runner.*.xcconfig')).each do |config_path|
     contents = File.readlines(config_path)
     contents.reject! { |line| line.start_with?('OTHER_LDFLAGS[sdk=') }
-    contents.map! do |line|
-      if line.start_with?('OTHER_LDFLAGS =')
-        updated = line
-          .gsub(' -framework "MediaPipeTasksGenAI"', '')
-        updated
-      else
-        line
-      end
-    end
     isar_flags = "-Wl,-u,_isar_clear -Wl,-u,_isar_connect_dart_api -Wl,-u,_isar_count -Wl,-u,_isar_delete -Wl,-u,_isar_delete_all -Wl,-u,_isar_delete_all_by_index -Wl,-u,_isar_delete_by_index -Wl,-u,_isar_filter_and_or_xor -Wl,-u,_isar_filter_double -Wl,-u,_isar_filter_id -Wl,-u,_isar_filter_link -Wl,-u,_isar_filter_link_length -Wl,-u,_isar_filter_list_length -Wl,-u,_isar_filter_long -Wl,-u,_isar_filter_not -Wl,-u,_isar_filter_null -Wl,-u,_isar_filter_object -Wl,-u,_isar_filter_static -Wl,-u,_isar_filter_string -Wl,-u,_isar_filter_string_contains -Wl,-u,_isar_filter_string_ends_with -Wl,-u,_isar_filter_string_matches -Wl,-u,_isar_filter_string_starts_with -Wl,-u,_isar_find_word_boundaries -Wl,-u,_isar_free_c_object_set -Wl,-u,_isar_free_json -Wl,-u,_isar_free_string -Wl,-u,_isar_free_word_boundaries -Wl,-u,_isar_get -Wl,-u,_isar_get_all -Wl,-u,_isar_get_all_by_index -Wl,-u,_isar_get_by_index -Wl,-u,_isar_get_error -Wl,-u,_isar_get_offsets -Wl,-u,_isar_get_size -Wl,-u,_isar_instance_close -Wl,-u,_isar_instance_close_and_delete -Wl,-u,_isar_instance_copy_to_file -Wl,-u,_isar_instance_create -Wl,-u,_isar_instance_create_async -Wl,-u,_isar_instance_get_collection -Wl,-u,_isar_instance_get_path -Wl,-u,_isar_instance_get_size -Wl,-u,_isar_instance_verify -Wl,-u,_isar_json_import -Wl,-u,_isar_key_add_byte -Wl,-u,_isar_key_add_byte_list_hash -Wl,-u,_isar_key_add_double -Wl,-u,_isar_key_add_float -Wl,-u,_isar_key_add_int -Wl,-u,_isar_key_add_int_list_hash -Wl,-u,_isar_key_add_long -Wl,-u,_isar_key_add_long_list_hash -Wl,-u,_isar_key_add_string -Wl,-u,_isar_key_add_string_hash -Wl,-u,_isar_key_add_string_list_hash -Wl,-u,_isar_key_create -Wl,-u,_isar_key_decrease -Wl,-u,_isar_key_increase -Wl,-u,_isar_link -Wl,-u,_isar_link_unlink -Wl,-u,_isar_link_unlink_all -Wl,-u,_isar_link_update_all -Wl,-u,_isar_link_verify -Wl,-u,_isar_put -Wl,-u,_isar_put_all -Wl,-u,_isar_put_all_by_index -Wl,-u,_isar_put_by_index -Wl,-u,_isar_q_aggregate -Wl,-u,_isar_q_aggregate_double_result -Wl,-u,_isar_q_aggregate_long_result -Wl,-u,_isar_q_delete -Wl,-u,_isar_q_export_json -Wl,-u,_isar_q_find -Wl,-u,_isar_q_free -Wl,-u,_isar_qb_add_distinct_by -Wl,-u,_isar_qb_add_id_where_clause -Wl,-u,_isar_qb_add_index_where_clause -Wl,-u,_isar_qb_add_link_where_clause -Wl,-u,_isar_qb_add_sort_by -Wl,-u,_isar_qb_build -Wl,-u,_isar_qb_create -Wl,-u,_isar_qb_set_filter -Wl,-u,_isar_qb_set_offset_limit -Wl,-u,_isar_stop_watching -Wl,-u,_isar_txn_begin -Wl,-u,_isar_txn_finish -Wl,-u,_isar_verify -Wl,-u,_isar_version -Wl,-u,_isar_watch_collection -Wl,-u,_isar_watch_object -Wl,-u,_isar_watch_query"
-    contents << "OTHER_LDFLAGS[sdk=iphoneos*] = $(inherited) $(OTHER_LDFLAGS) -force_load \"#{force_device_archive}\" #{isar_flags}\n"
-    contents << "OTHER_LDFLAGS[sdk=iphonesimulator*] = $(inherited) $(OTHER_LDFLAGS) -force_load \"#{force_sim_archive}\" #{isar_flags}\n"
+    contents << "OTHER_LDFLAGS[sdk=iphoneos*] = $(inherited) $(OTHER_LDFLAGS) #{isar_flags}\n"
+    contents << "OTHER_LDFLAGS[sdk=iphonesimulator*] = $(inherited) $(OTHER_LDFLAGS) #{isar_flags}\n"
     File.write(config_path, contents.join)
+  end
+
+  # LiteRT-LM gpu_registry calls SharedLibrary::Load by basename
+  installer.aggregate_targets.each do |aggregate_target|
+    aggregate_target.user_targets.each do |user_target|
+      next if user_target.shell_script_build_phases.any? { |p| p.name == '[flutter_gemma] Setup LiteRT-LM iOS' }
+      phase = user_target.new_shell_script_build_phase('[flutter_gemma] Setup LiteRT-LM iOS')
+      phase.shell_script = <<-SHELL
+        set -e
+        FRAMEWORKS="${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Frameworks"
+        if [ ! -d "${FRAMEWORKS}" ]; then
+          echo "[flutter_gemma] no Frameworks/ in ${PRODUCT_NAME}.app — skipping"
+          exit 0
+        fi
+        for base in LiteRtMetalAccelerator GemmaModelConstraintProvider; do
+          src="${base}.framework/${base}"
+          if [ ! -e "${FRAMEWORKS}/${src}" ]; then
+            echo "[flutter_gemma] ${FRAMEWORKS}/${src} missing — Native Assets did not bundle it"
+            continue
+          fi
+          dst="${FRAMEWORKS}/lib${base}.dylib"
+          if [ ! -e "${dst}" ]; then
+            ln -sf "${src}" "${dst}"
+            echo "[flutter_gemma] symlinked lib${base}.dylib -> ${src}"
+          fi
+        done
+      SHELL
+    end
   end
 end

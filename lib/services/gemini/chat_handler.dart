@@ -109,6 +109,7 @@ class ChatHandler {
       maxTokens: maxTokens,
       preferredBackend: preferredBackend,
       supportImage: supportImage,
+      maxNumImages: supportImage ? 1 : null,
     );
   };
 
@@ -118,7 +119,8 @@ class ChatHandler {
   PreferredBackend? _cachedInferenceModelBackend;
   bool _cachedInferenceModelSupportsImage = false;
 
-  bool get supportsImageConsultation => !Platform.isIOS;
+  bool get supportsImageConsultation => true;
+  bool get supportsNativeImageConsultation => !Platform.isIOS;
 
   /// 确保初始化
   Future<void> ensureInitialized() {
@@ -158,6 +160,7 @@ class ChatHandler {
         maxTokens: maxTokens,
         preferredBackend: preferredBackend,
         supportImage: supportImage,
+        maxNumImages: supportImage ? 1 : null,
       );
     };
   }
@@ -180,7 +183,7 @@ class ChatHandler {
         _cachedBackend = PreferredBackend.gpu;
       }
     } else {
-      _cachedBackend = PreferredBackend.cpu;
+      _cachedBackend = PreferredBackend.gpu;
     }
     return _cachedBackend!;
   }
@@ -191,19 +194,23 @@ class ChatHandler {
     if (override != null) return override();
 
     final possiblePaths = <String>[];
-    final extDir = Platform.isAndroid ? await getExternalStorageDirectory() : null;
+    final extDir =
+        Platform.isAndroid ? await getExternalStorageDirectory() : null;
     if (extDir != null) {
       possiblePaths.add('${extDir.path}/${AppConstants.gemmaModelId}');
-      possiblePaths.add('${extDir.path}/${AppConstants.modelsDirName}/${AppConstants.gemmaModelId}');
+      possiblePaths.add(
+          '${extDir.path}/${AppConstants.modelsDirName}/${AppConstants.gemmaModelId}');
       possiblePaths.add('${extDir.path}/files/${AppConstants.gemmaModelId}');
     }
     final intDir = await getApplicationDocumentsDirectory();
     possiblePaths.add('${intDir.path}/${AppConstants.gemmaModelId}');
-    possiblePaths.add('${intDir.path}/${AppConstants.modelsDirName}/${AppConstants.gemmaModelId}');
+    possiblePaths.add(
+        '${intDir.path}/${AppConstants.modelsDirName}/${AppConstants.gemmaModelId}');
 
     for (final path in possiblePaths) {
       final file = File(path);
-      if (await file.exists() && await file.length() >= AppConstants.minGemmaModelBytes) {
+      if (await file.exists() &&
+          await file.length() >= AppConstants.minGemmaModelBytes) {
         return path;
       }
     }
@@ -213,7 +220,8 @@ class ChatHandler {
   /// 获取模型状态
   Future<ModelState> getModelState() async {
     await ensureInitialized();
-    if (await modelInstalledChecker(AppConstants.gemmaModelId)) return ModelState.ready;
+    if (await modelInstalledChecker(AppConstants.gemmaModelId))
+      return ModelState.ready;
     if ((await findExistingModelPath()) != null) return ModelState.fileDetected;
     return ModelState.none;
   }
@@ -253,7 +261,6 @@ class ChatHandler {
       (backend: detectedBackend, supportImage: supportImage),
       if (detectedBackend != PreferredBackend.cpu)
         (backend: PreferredBackend.cpu, supportImage: supportImage),
-      if (supportImage) (backend: PreferredBackend.cpu, supportImage: false),
     ];
 
     Object? lastError;
@@ -269,6 +276,10 @@ class ChatHandler {
       }
 
       try {
+        await _disposeModelBeforeReloadIfNeeded(
+          backend: attempt.backend,
+          supportImage: attempt.supportImage,
+        );
         final model = await activeModelGetter(
           maxTokens: maxTokens,
           preferredBackend: attempt.backend,
@@ -293,6 +304,22 @@ class ChatHandler {
     }
 
     throw ModelException.loadFailed(cause: lastError);
+  }
+
+  Future<void> _disposeModelBeforeReloadIfNeeded({
+    required PreferredBackend? backend,
+    required bool supportImage,
+  }) async {
+    if (_cachedInferenceModel != null) {
+      await _disposeCachedInferenceModel();
+      return;
+    }
+
+    if (supportImage || backend != _cachedInferenceModelBackend) {
+      try {
+        await FlutterGemmaPlugin.instance.initializedModel?.close();
+      } catch (_) {}
+    }
   }
 
   /// 释放缓存的推理模型
@@ -360,6 +387,9 @@ class ChatHandler {
       }
       await ensureInitialized();
       await _ensureActiveModelInstalled();
+      if (imageBytes != null && !supportsNativeImageConsultation) {
+        imageBytes = null;
+      }
       final resolvedModel = await _loadActiveModelWithFallback(
         maxTokens: AppConstants.chatMaxTokens,
         supportImage: imageBytes != null,
@@ -372,6 +402,7 @@ class ChatHandler {
       session = await model.createSession(
         temperature: AppConstants.chatTemperature,
         topK: AppConstants.chatTopK,
+        enableVisionModality: imageBytes != null,
       );
 
       final promptBuffer = StringBuffer();
@@ -575,6 +606,10 @@ class ChatHandler {
     if (path != null) return path;
     final directory = await getApplicationDocumentsDirectory();
     return '${directory.path}/${AppConstants.gemmaModelId}';
+  }
+
+  Future<void> releaseCachedInferenceModel() async {
+    await _disposeCachedInferenceModel();
   }
 
   /// 清理资源

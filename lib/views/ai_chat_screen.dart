@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_gemma/flutter_gemma.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -30,7 +31,9 @@ class AIChatScreen extends StatefulWidget {
 }
 
 class _AIChatScreenState extends State<AIChatScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  static const Duration _modelIdleReleaseDelay = Duration(minutes: 3);
+
   final GeminiService _aiService = GeminiService();
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -54,12 +57,14 @@ class _AIChatScreenState extends State<AIChatScreen>
   String _currentAiResponse = '';
   StreamSubscription? _downloadSubscription;
   Timer? _liveRestartTimer;
+  Timer? _modelReleaseTimer;
 
   // 语音与图片状态
   bool _isListening = false;
   Uint8List? _selectedImageBytes;
   String? _selectedImagePath;
   bool _speechEnabled = false;
+  String? _selectedImageOcrText;
 
   // 实时对话 (Live Mode) 状态
   bool _isLiveMode = false;
@@ -85,6 +90,7 @@ class _AIChatScreenState extends State<AIChatScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _waveController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -99,6 +105,7 @@ class _AIChatScreenState extends State<AIChatScreen>
     _checkEngineStatus();
     _listenToDownloads();
     _handleLostData();
+    _scheduleModelRelease();
 
     // 终极性能优化：避开页面转场动画的黄金 800ms
     Future.delayed(const Duration(milliseconds: 800), () {
@@ -118,6 +125,16 @@ class _AIChatScreenState extends State<AIChatScreen>
         });
       }
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _releaseCachedModelIfIdle();
+    } else if (state == AppLifecycleState.resumed) {
+      _scheduleModelRelease();
+    }
   }
 
   Future<void> _handleLostData() async {
@@ -207,6 +224,7 @@ class _AIChatScreenState extends State<AIChatScreen>
         return;
       }
     }
+    _cancelModelReleaseTimer();
     setState(() {
       _isLiveMode = true;
       _liveStatus = '聆听中...';
@@ -251,6 +269,7 @@ class _AIChatScreenState extends State<AIChatScreen>
       _liveAiResponse = '';
       _isProcessingLiveInput = false;
     });
+    _scheduleModelRelease();
   }
 
   void _startLiveListening() async {
@@ -341,6 +360,7 @@ class _AIChatScreenState extends State<AIChatScreen>
 
   Future<void> _processLiveInput(String text) async {
     if (_isProcessingLiveInput) return;
+    _cancelModelReleaseTimer();
     _isProcessingLiveInput = true;
     await _localAsrService.stop();
     _ttsTextQueue.clear();
@@ -409,6 +429,9 @@ class _AIChatScreenState extends State<AIChatScreen>
       }
     } finally {
       _isProcessingLiveInput = false;
+      if (!_isLiveMode) {
+        _scheduleModelRelease();
+      }
     }
   }
 
@@ -462,22 +485,40 @@ class _AIChatScreenState extends State<AIChatScreen>
 
   Future<void> _pickImage(ImageSource source) async {
     try {
+      _scheduleModelRelease();
       if (!mounted) return;
       final XFile? image = await _picker.pickImage(
-          source: source, maxWidth: 1280, maxHeight: 1280, imageQuality: 85);
+          source: source, maxWidth: 768, maxHeight: 768, imageQuality: 70);
       if (image != null) {
         await Future.delayed(const Duration(milliseconds: 200));
         final bytes = await image.readAsBytes();
+        final ocrText = await _extractTextFromImage(image.path);
         if (mounted) {
           setState(() {
             _selectedImageBytes = bytes;
             _selectedImagePath = image.path;
+            _selectedImageOcrText = ocrText;
           });
+          _scheduleModelRelease();
           FocusScope.of(context).unfocus();
         }
       }
     } catch (e) {
       debugPrint('图片选择失败: $e');
+    }
+  }
+
+  Future<String> _extractTextFromImage(String imagePath) async {
+    final inputImage = InputImage.fromFilePath(imagePath);
+    final recognizer = TextRecognizer(script: TextRecognitionScript.chinese);
+    try {
+      final recognizedText = await recognizer.processImage(inputImage);
+      return recognizedText.text.trim();
+    } catch (e) {
+      debugPrint('咨询图片 OCR 失败: $e');
+      return '';
+    } finally {
+      await recognizer.close();
     }
   }
 
@@ -567,6 +608,9 @@ class _AIChatScreenState extends State<AIChatScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _cancelModelReleaseTimer();
+    unawaited(_aiService.releaseCachedInferenceModel());
     _inputController.dispose();
     _scrollController.dispose();
     _liveScrollController.dispose();
@@ -667,7 +711,9 @@ class _AIChatScreenState extends State<AIChatScreen>
   Future<void> _handleSend() async {
     final text = _inputController.text.trim();
     final image = _selectedImageBytes;
+    final imageOcrText = _selectedImageOcrText?.trim() ?? '';
     if ((text.isEmpty && image == null) || _isTyping) return;
+    _cancelModelReleaseTimer();
     _inputController.clear();
     _ttsTextQueue.clear();
     _ttsAudioQueue.clear();
@@ -679,16 +725,17 @@ class _AIChatScreenState extends State<AIChatScreen>
       _currentAiResponse = '';
       _selectedImageBytes = null;
       _selectedImagePath = null;
+      _selectedImageOcrText = null;
     });
     _scrollToBottom();
     try {
       final history = _getOptimizedHistory();
-      _updateLongTermMemory(text);
+      final promptText = _buildImageSafePrompt(text, imageOcrText);
+      _updateLongTermMemory(promptText);
       final answer = await _aiService.askPharmacist(
-        text.isEmpty ? "请看这张图片内容" : text,
+        promptText,
         history: history,
         keywords: _longTermKeywords.toList(),
-        imageBytes: image,
         onStream: (partial) {
           if (!mounted) return;
           setState(() => _currentAiResponse = partial);
@@ -709,6 +756,7 @@ class _AIChatScreenState extends State<AIChatScreen>
         _ttsTextQueue.add(remaining);
         _runGenerationLoop();
       }
+      _scheduleModelRelease();
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -717,7 +765,55 @@ class _AIChatScreenState extends State<AIChatScreen>
         });
         _showChatError(e);
       }
+      _scheduleModelRelease();
     }
+  }
+
+  String _buildImageSafePrompt(String text, String imageOcrText) {
+    if (imageOcrText.isEmpty) {
+      return text.isEmpty
+          ? '我发送了一张药品或医嘱图片，但本机未能从图片中识别出文字。请提示我重新拍摄清晰的药盒、说明书或医嘱文字区域。'
+          : text;
+    }
+
+    final buffer = StringBuffer();
+    if (text.isNotEmpty) {
+      buffer.writeln(text);
+      buffer.writeln();
+    } else {
+      buffer.writeln('请根据下面从药品或医嘱图片中识别到的文字，进行用药咨询。');
+      buffer.writeln();
+    }
+    buffer.writeln('【图片 OCR 文字】');
+    buffer.write(imageOcrText);
+    return buffer.toString();
+  }
+
+  void _scheduleModelRelease() {
+    _cancelModelReleaseTimer();
+    if (_isTyping || _isLiveMode || _isListening || _isProcessingLiveInput) {
+      return;
+    }
+    _modelReleaseTimer =
+        Timer(_modelIdleReleaseDelay, _releaseCachedModelIfIdle);
+  }
+
+  void _cancelModelReleaseTimer() {
+    _modelReleaseTimer?.cancel();
+    _modelReleaseTimer = null;
+  }
+
+  void _releaseCachedModelIfIdle() {
+    if (_isTyping ||
+        _isLiveMode ||
+        _isListening ||
+        _isProcessingLiveInput ||
+        _isGenerating ||
+        _isPlaying) {
+      _scheduleModelRelease();
+      return;
+    }
+    unawaited(_aiService.releaseCachedInferenceModel());
   }
 
   @override
@@ -1124,6 +1220,7 @@ class _AIChatScreenState extends State<AIChatScreen>
                                 setState(() {
                                   _selectedImageBytes = null;
                                   _selectedImagePath = null;
+                                  _selectedImageOcrText = null;
                                 });
                               },
                               child: Container(
@@ -1135,12 +1232,14 @@ class _AIChatScreenState extends State<AIChatScreen>
                                       size: 14, color: Colors.white))))
                     ]))),
           Row(children: [
-            _buildActionButton(
-                icon: Icons.add_photo_alternate_rounded,
-                onPressed: () => _showImageSourceSheet(),
-                color: const Color(0xFF6B7280),
-                backgroundColor: const Color(0xFFF3F4F6)),
-            const SizedBox(width: 12),
+            if (_aiService.supportsImageConsultation) ...[
+              _buildActionButton(
+                  icon: Icons.add_photo_alternate_rounded,
+                  onPressed: () => _showImageSourceSheet(),
+                  color: const Color(0xFF6B7280),
+                  backgroundColor: const Color(0xFFF3F4F6)),
+              const SizedBox(width: 12),
+            ],
             Expanded(
                 child: TextField(
                     controller: _inputController,
@@ -1224,7 +1323,8 @@ class _AIChatScreenState extends State<AIChatScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('当前 iPhone 本地 Gemma 4 仅支持文字咨询，请直接输入问题。'),
+            content: Text(
+                '受限于苹果设备统一内存限制，GPU加速的大模型暂不支持在聊天中发送图片。请直接输入文字或使用识药页面的OCR功能。'),
           ),
         );
       }

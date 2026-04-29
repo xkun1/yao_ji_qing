@@ -70,7 +70,7 @@ class AppConstants {
   /// 对话参数
   static const double chatTemperature = 0.7;
   static const int chatTopK = 40;
-  static int chatMaxTokens = Platform.isAndroid ? 2048 : 1024;
+  static const int chatMaxTokens = 2048;
 
   /// TTS 参数
   static const double ttsLengthScale = 1.15; // 语速调节

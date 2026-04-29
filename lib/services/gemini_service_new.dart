@@ -33,11 +33,13 @@ class GeminiService {
   final AsrHandler _asrHandler = AsrHandler();
 
   // 振动通道
-  final _vibrationChannel = const MethodChannel('yao_ji_qing/medication_vibration');
+  final _vibrationChannel =
+      const MethodChannel('yao_ji_qing/medication_vibration');
 
   // 下载更新流
   Stream get downloadUpdates => _downloader.downloadUpdates;
-  ModelDownloadSnapshot get modelDownloadSnapshot => _downloader.downloadSnapshot;
+  ModelDownloadSnapshot get modelDownloadSnapshot =>
+      _downloader.downloadSnapshot;
 
   // TTS 相关
   bool get autoSpeak => _ttsHandler.autoSpeak;
@@ -94,7 +96,8 @@ class GeminiService {
       }
 
       final docsDir = await getApplicationDocumentsDirectory();
-      final modelRoot = Directory('${docsDir.path}/${AppConstants.modelsDirName}');
+      final modelRoot =
+          Directory('${docsDir.path}/${AppConstants.modelsDirName}');
       await modelRoot.create(recursive: true);
       final targetFile = File('${modelRoot.path}/${AppConstants.gemmaModelId}');
       if (await targetFile.exists() &&
@@ -129,8 +132,10 @@ class GeminiService {
   Future<void> downloadAsrModel() async {
     try {
       final docsDir = await getApplicationDocumentsDirectory();
-      final modelRoot = Directory('${docsDir.path}/${AppConstants.asrModelsDirName}');
-      final targetDir = Directory('${modelRoot.path}/${AppConstants.asrDirName}');
+      final modelRoot =
+          Directory('${docsDir.path}/${AppConstants.asrModelsDirName}');
+      final targetDir =
+          Directory('${modelRoot.path}/${AppConstants.asrDirName}');
       await targetDir.create(recursive: true);
 
       FileDownloader().configureNotification(
@@ -152,7 +157,8 @@ class GeminiService {
         File('${modelRoot.path}/${AppConstants.asrArchiveId}'),
         targetDir,
       );
-      await FileUtils.deleteFile('${modelRoot.path}/${AppConstants.asrArchiveId}');
+      await FileUtils.deleteFile(
+          '${modelRoot.path}/${AppConstants.asrArchiveId}');
       _downloader.setDownloadStage('asr', 1, '下载完成，正在重启...');
       await restartApp();
       _downloader.clearDownloadSnapshot();
@@ -166,8 +172,10 @@ class GeminiService {
   Future<void> downloadTtsModel() async {
     try {
       final docsDir = await getApplicationDocumentsDirectory();
-      final modelRoot = Directory('${docsDir.path}/${AppConstants.ttsModelsDirName}');
-      final targetDir = Directory('${modelRoot.path}/${AppConstants.ttsDirName}');
+      final modelRoot =
+          Directory('${docsDir.path}/${AppConstants.ttsModelsDirName}');
+      final targetDir =
+          Directory('${modelRoot.path}/${AppConstants.ttsDirName}');
       await targetDir.create(recursive: true);
 
       FileDownloader().configureNotification(
@@ -190,7 +198,8 @@ class GeminiService {
         targetDir,
         stripFirstPathComponent: true,
       );
-      await FileUtils.deleteFile('${modelRoot.path}/${AppConstants.ttsArchiveId}');
+      await FileUtils.deleteFile(
+          '${modelRoot.path}/${AppConstants.ttsArchiveId}');
       _downloader.setDownloadStage('tts', 1, '下载完成，正在重启...');
       await restartApp();
       _downloader.clearDownloadSnapshot();
@@ -270,7 +279,8 @@ class GeminiService {
   }
 
   /// 获取下载快照
-  ModelDownloadSnapshot? downloadSnapshotForFilename(String filename, {double progress = -1}) {
+  ModelDownloadSnapshot? downloadSnapshotForFilename(String filename,
+      {double progress = -1}) {
     return _downloader.getSnapshotForFilename(filename, progress: progress);
   }
 
@@ -316,8 +326,13 @@ class GeminiService {
     return await _asrHandler.getModelPathForDeletion();
   }
 
+  Future<void> releaseCachedInferenceModel() async {
+    await _chatHandler.releaseCachedInferenceModel();
+  }
+
   /// 保存 WAV 文件
-  Future<String> saveWav(Float32List samples, int sampleRate, String fileName) async {
+  Future<String> saveWav(
+      Float32List samples, int sampleRate, String fileName) async {
     return await FileUtils.saveWav(samples, sampleRate, fileName);
   }
 
