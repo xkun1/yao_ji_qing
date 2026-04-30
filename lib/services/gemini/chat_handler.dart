@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
@@ -220,8 +219,9 @@ class ChatHandler {
   /// 获取模型状态
   Future<ModelState> getModelState() async {
     await ensureInitialized();
-    if (await modelInstalledChecker(AppConstants.gemmaModelId))
+    if (await modelInstalledChecker(AppConstants.gemmaModelId)) {
       return ModelState.ready;
+    }
     if ((await findExistingModelPath()) != null) return ModelState.fileDetected;
     return ModelState.none;
   }
@@ -331,28 +331,6 @@ class ChatHandler {
     try {
       await existingModel?.close();
     } catch (_) {}
-  }
-
-  /// 描述聊天错误
-  String _describeChatError(Object error) {
-    final message = error.toString().toLowerCase();
-    if (message.contains('not ready') ||
-        message.contains('not initialized') ||
-        message.contains('not installed') ||
-        message.contains('no active model')) {
-      return 'AI 引擎还没准备好，请先完成模型初始化。';
-    }
-    if (message.contains('gpu') ||
-        message.contains('npu') ||
-        message.contains('backend') ||
-        message.contains('delegate')) {
-      return '当前设备暂时无法稳定运行药师咨询，请稍后重试。';
-    }
-    if (message.contains('litertresourcecalculator') ||
-        message.contains('validatedgraphconfig')) {
-      return '当前 iOS 推理引擎与模型不兼容，请在模型管理里重新安装当前设备支持的引擎。';
-    }
-    return '本地药师暂时忙不过来，请稍后再试。';
   }
 
   /// 关闭会话和模型

@@ -235,6 +235,43 @@ class GeminiService {
     await prefs.setBool('auto_speak', _autoSpeak);
   }
 
+  /// 离线体验与健壮性兜底：启动时清理残留的不完整下载文件和孤儿任务，防止占用磁盘空间和假死
+  Future<void> cleanupIncompleteModels() async {
+    try {
+      final docsDir = await getApplicationDocumentsDirectory();
+      final modelRoot = Directory('${docsDir.path}/models');
+      if (!await modelRoot.exists()) return;
+
+      // 1. 清理不完整的 Gemma 主模型
+      final gemmaFile = File('${modelRoot.path}/$_modelId');
+      if (await gemmaFile.exists() && await gemmaFile.length() < _minGemmaModelBytes) {
+        debugPrint('清理不完整的 Gemma 模型文件以释放空间...');
+        await gemmaFile.delete();
+      }
+
+      // 2. 清理 ASR/TTS 未解压完的孤儿压缩包
+      final asrFile = File('${modelRoot.path}/asr/$_asrArchiveId');
+      if (await asrFile.exists() && await asrFile.length() < _minAsrArchiveBytes) {
+        await asrFile.delete();
+      }
+      
+      final ttsFile = File('${modelRoot.path}/tts/$_ttsArchiveId');
+      if (await ttsFile.exists() && await ttsFile.length() < _minTtsArchiveBytes) {
+        await ttsFile.delete();
+      }
+
+      // 3. 清除 FileDownloader 中遗留的失败记录
+      final records = await FileDownloader().database.allRecords();
+      for (final record in records) {
+        if (record.status == TaskStatus.failed || record.status == TaskStatus.canceled) {
+          await FileDownloader().database.deleteRecordWithId(record.taskId);
+        }
+      }
+    } catch (e) {
+      debugPrint('清理残留模型文件失败: $e');
+    }
+  }
+
   Future<void> initTts() async {
     if (_sherpaTts != null) return;
 

@@ -22,8 +22,10 @@ void main() async {
   final dbService = DatabaseService();
   await dbService.init();
 
-  // 加载 AI 设置
-  await GeminiService().loadSettings();
+  // 加载 AI 设置与清理缓存
+  final geminiService = GeminiService();
+  await geminiService.loadSettings();
+  await geminiService.cleanupIncompleteModels();
 
   runApp(const YaoJiQingApp());
 }

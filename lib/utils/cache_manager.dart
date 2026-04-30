@@ -56,7 +56,7 @@ class CacheManager {
     _currentMemoryCacheBytes += valueSize;
 
     if (kDebugMode) {
-      debugPrint('✅ [Cache] 内存缓存设置: $key (大小: ${valueSize} bytes)');
+      debugPrint('✅ [Cache] 内存缓存设置: $key (大小: $valueSize bytes)');
     }
   }
 

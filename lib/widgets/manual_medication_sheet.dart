@@ -202,14 +202,14 @@ class _ManualMedicationSheetState extends State<ManualMedicationSheet> {
                         ),
                       );
                       
-                      if (confirmed == true && mounted) {
+                      if (confirmed == true && context.mounted) {
                         setState(() => _isSaving = true);
                         try {
                           // 核心：彻底删除，内部已包含 iOS 连环提醒和 Android 止震逻辑
                           await DatabaseService().deleteMedication(widget.medicine!);
-                          if (mounted) Navigator.pop(context, true);
+                          if (context.mounted) Navigator.pop(context, true);
                         } catch (e) {
-                          if (mounted) {
+                          if (context.mounted) {
                             setState(() => _isSaving = false);
                             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("操作失败: $e")));
                           }

@@ -12,22 +12,25 @@ include: package:flutter_lints/flutter.yaml
 analyzer:
   exclude:
     - third_party/**
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
 
 linter:
-  # The lint rules applied to this project can be customized in the
-  # section below to disable rules from the `package:flutter_lints/flutter.yaml`
-  # included above or to enable additional rules. A list of all available lints
-  # and their documentation is published at
-  # https://dart-lang.github.io/linter/lints/index.html.
-  #
-  # Instead of disabling a lint rule for the entire project in the
-  # section below, it can also be suppressed for a single line of code
-  # or a specific dart file by using the `// ignore: name_of_lint` and
-  # `// ignore_for_file: name_of_lint` syntax on the line or in the file
-  # producing the lint.
   rules:
-    # avoid_print: false  # Uncomment to disable the `avoid_print` rule
-    # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
+    # 强制要求良好的类型安全
+    always_declare_return_types: true
+    avoid_print: true
+    # 安全性与空安全
+    cancel_subscriptions: true
+    close_sinks: true
+    avoid_empty_else: true
+    # 强制组件不可变性与最佳实践
+    prefer_const_constructors: true
+    prefer_const_declarations: true
+    use_key_in_widget_constructors: true
+    prefer_final_fields: true
+    prefer_final_locals: true
+
 
 # Additional information about this file can be found at
 # https://dart.dev/guides/language/analysis-options

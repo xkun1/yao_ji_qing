@@ -55,6 +55,7 @@ class FeatureGuideOverlay extends StatefulWidget {
         },
       ),
     );
+    if (!context.mounted) return;
     Overlay.of(context).insert(overlayEntry);
   }
 

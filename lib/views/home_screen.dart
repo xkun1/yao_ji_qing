@@ -487,7 +487,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildNavItem(IconData icon, int index) {
-    bool isActive = _currentIndex == index;
+    final bool isActive = _currentIndex == index;
     return InkWell(
       onTap: () => setState(() => _currentIndex = index),
       splashColor: Colors.transparent, // 禁用扩散效果

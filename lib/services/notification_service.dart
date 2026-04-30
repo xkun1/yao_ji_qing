@@ -183,8 +183,7 @@ class NotificationService {
         'hour': hour,
         'minute': minute,
       });
-    } on PlatformException {
-    } on MissingPluginException {}
+    } catch (_) {}
   }
 
   Future<void> _cancelNativeVibration(int id) async {
@@ -195,8 +194,9 @@ class NotificationService {
           .invokeMethod<void>('cancelDailyVibration', <String, int>{
         'id': id,
       });
-    } on PlatformException {
-    } on MissingPluginException {}
+    } catch (_) {
+      // ignore
+    }
   }
 
   Future<void> _stopActiveVibration() async {
@@ -204,8 +204,7 @@ class NotificationService {
 
     try {
       await _vibrationChannel.invokeMethod<void>('stopActiveVibration');
-    } on PlatformException {
-    } on MissingPluginException {}
+    } catch (_) {}
   }
 
   Future<void> startForegroundService() async {

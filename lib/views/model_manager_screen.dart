@@ -101,9 +101,9 @@ class _ModelManagerScreenState extends State<ModelManagerScreen> {
       final aReady = await _aiService.checkAsrFilesExist();
       final tReady = await _aiService.checkTtsFilesExist();
 
-      String gSize =
+      final String gSize =
           gModelPath == null ? '未下载' : await _getFileSize(gModelPath);
-      String aSize = aReady
+      final String aSize = aReady
           ? await _getDirSize(await _aiService.getAsrModelPathForDeletion())
           : '未下载';
 
@@ -418,9 +418,9 @@ class _ModelManagerScreenState extends State<ModelManagerScreen> {
         showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (context) => WillPopScope(
-            onWillPop: () async => false,
-            child: const AlertDialog(
+          builder: (context) => const PopScope(
+            canPop: false,
+            child: AlertDialog(
               title: Text("安装完成"),
               content: Column(
                 mainAxisSize: MainAxisSize.min,

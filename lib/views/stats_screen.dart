@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:isar/isar.dart';
+import '../core/strings.dart';
 import '../models/medicine.dart';
 import '../services/database_service.dart';
 
@@ -17,15 +18,14 @@ class _StatsScreenState extends State<StatsScreen> {
   
   // 统计数据
   double _complianceRate = 0.0;
-  int _totalPlanned = 0;
   int _totalTaken = 0;
   
   // 按时间段分类的数据
   Map<String, int> _timeBucketStats = {
-    "早晨 (05-11)": 0,
-    "中午 (11-16)": 0,
-    "晚上 (16-21)": 0,
-    "深夜 (21-05)": 0,
+    AppStrings.statsMorning: 0,
+    AppStrings.statsNoon: 0,
+    AppStrings.statsEvening: 0,
+    AppStrings.statsNight: 0,
   };
 
   List<IntakeLog> _recentLogs = [];
@@ -46,32 +46,37 @@ class _StatsScreenState extends State<StatsScreen> {
         .filter()
         .planTimeBetween(sevenDaysAgo, now)
         .sortByPlanTimeDesc()
+        .limit(100) // 保护机制，防止万一一天记录极多导致内存问题
         .findAll();
 
     // 2. 计算服药遵从率
     // 注意：这里的 totalPlanned 我们暂时根据 logs 数量推算，或者从 Reminder 逻辑推导
     // 为简单直观，我们统计近 7 天“已标记服用”的数量与“总记录”的比例
-    int takenCount = logs.where((l) => l.isTaken).length;
-    int totalCount = logs.length;
+    final int takenCount = logs.where((l) => l.isTaken).length;
+    final int totalCount = logs.length;
 
     // 3. 按时间段分类
-    Map<String, int> buckets = {"早晨 (05-11)": 0, "中午 (11-16)": 0, "晚上 (16-21)": 0, "深夜 (21-05)": 0};
+    final Map<String, int> buckets = {
+      AppStrings.statsMorning: 0,
+      AppStrings.statsNoon: 0,
+      AppStrings.statsEvening: 0,
+      AppStrings.statsNight: 0
+    };
     for (var log in logs.where((l) => l.isTaken)) {
-      int hour = log.planTime.hour;
+      final int hour = log.planTime.hour;
       if (hour >= 5 && hour < 11) {
-        buckets["早晨 (05-11)"] = buckets["早晨 (05-11)"]! + 1;
+        buckets[AppStrings.statsMorning] = buckets[AppStrings.statsMorning]! + 1;
       } else if (hour >= 11 && hour < 16) {
-        buckets["中午 (11-16)"] = buckets["中午 (11-16)"]! + 1;
+        buckets[AppStrings.statsNoon] = buckets[AppStrings.statsNoon]! + 1;
       } else if (hour >= 16 && hour < 21) {
-        buckets["晚上 (16-21)"] = buckets["晚上 (16-21)"]! + 1;
+        buckets[AppStrings.statsEvening] = buckets[AppStrings.statsEvening]! + 1;
       } else {
-        buckets["深夜 (21-05)"] = buckets["深夜 (21-05)"]! + 1;
+        buckets[AppStrings.statsNight] = buckets[AppStrings.statsNight]! + 1;
       }
     }
 
     if (mounted) {
       setState(() {
-        _totalPlanned = totalCount;
         _totalTaken = takenCount;
         _complianceRate = totalCount == 0 ? 0 : takenCount / totalCount;
         _timeBucketStats = buckets;
@@ -86,7 +91,7 @@ class _StatsScreenState extends State<StatsScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       appBar: AppBar(
-        title: const Text("健康统计"),
+        title: const Text(AppStrings.statsTitle),
         backgroundColor: Colors.white,
         elevation: 0,
       ),
@@ -147,7 +152,7 @@ class _StatsScreenState extends State<StatsScreen> {
                 const SizedBox(height: 4),
                 Text("近 7 天共坚持服药 $_totalTaken 次", 
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1F2937))),
-                Text("保持这种节奏，坤哥棒棒哒！✨", style: TextStyle(color: const Color(0xFF10B981), fontSize: 12)),
+                const Text("保持这种节奏，坤哥棒棒哒！✨", style: TextStyle(color: Color(0xFF10B981), fontSize: 12)),
               ],
             ),
           )
@@ -169,7 +174,7 @@ class _StatsScreenState extends State<StatsScreen> {
           const Text("分时段统计", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 20),
           ..._timeBucketStats.entries.map((e) {
-            double percent = _totalTaken == 0 ? 0 : e.value / _totalTaken;
+            final double percent = _totalTaken == 0 ? 0 : e.value / _totalTaken;
             return Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: Column(
@@ -206,10 +211,14 @@ class _StatsScreenState extends State<StatsScreen> {
     if (_recentLogs.isEmpty) {
       return const Center(child: Text("暂无服用记录", style: TextStyle(color: Color(0xFF9CA3AF))));
     }
-    return Column(
-      children: _recentLogs.map((log) {
-        String dateStr = DateFormat('MM-dd').format(log.planTime);
-        String timeStr = DateFormat('HH:mm').format(log.planTime);
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: _recentLogs.length,
+      itemBuilder: (context, index) {
+        final log = _recentLogs[index];
+        final String dateStr = DateFormat('MM-dd').format(log.planTime);
+        final String timeStr = DateFormat('HH:mm').format(log.planTime);
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -221,7 +230,7 @@ class _StatsScreenState extends State<StatsScreen> {
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: const Color(0xFFF0FDF4), shape: BoxShape.circle),
+                decoration: const BoxDecoration(color: Color(0xFFF0FDF4), shape: BoxShape.circle),
                 child: const Icon(Icons.check_rounded, color: Color(0xFF10B981), size: 18),
               ),
               const SizedBox(width: 16),
@@ -235,11 +244,11 @@ class _StatsScreenState extends State<StatsScreen> {
                 ),
               ),
               if (log.actualTime != null)
-                Text("已服", style: const TextStyle(color: Color(0xFF10B981), fontSize: 13, fontWeight: FontWeight.bold)),
+                const Text("已服", style: TextStyle(color: Color(0xFF10B981), fontSize: 13, fontWeight: FontWeight.bold)),
             ],
           ),
         );
-      }).toList(),
+      },
     );
   }
 }

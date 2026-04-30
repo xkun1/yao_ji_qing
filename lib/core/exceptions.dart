@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 
 /// 统一的异常基类
 class AppException implements Exception {

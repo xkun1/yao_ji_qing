@@ -81,13 +81,13 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               ),
             ),
             // 底部宗旨
-            Positioned(
+            const Positioned(
               bottom: 80,
               left: 0,
               right: 0,
               child: Column(
                 children: [
-                  const Text(
+                  Text(
                     "准时服药",
                     style: TextStyle(
                       fontSize: 18,
@@ -96,8 +96,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       letterSpacing: 2,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
+                  SizedBox(height: 8),
+                  Text(
                     "不 负 爱 与 嘱 托",
                     style: TextStyle(
                       fontSize: 14,
