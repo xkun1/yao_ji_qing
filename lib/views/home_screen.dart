@@ -403,8 +403,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildArcMenuOverlay() {
-    if (!_isMenuOpen && _animationController.value == 0)
+    if (!_isMenuOpen && _animationController.value == 0) {
       return const SizedBox.shrink();
+    }
 
     return Positioned(
       bottom: 60,
