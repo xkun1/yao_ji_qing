@@ -18,7 +18,7 @@ void main() {
 
     test('setDownloadStage updates snapshot', () {
       downloader.setDownloadStage('gemma', 0.5, 'Downloading');
-      
+
       final snapshot = downloader.downloadSnapshot;
       expect(snapshot.isActive, isTrue);
       expect(snapshot.type, 'gemma');
@@ -29,7 +29,7 @@ void main() {
     test('clearDownloadSnapshot resets to inactive', () {
       downloader.setDownloadStage('gemma', 0.5, 'Downloading');
       downloader.clearDownloadSnapshot();
-      
+
       final snapshot = downloader.downloadSnapshot;
       expect(snapshot.isActive, isFalse);
       expect(snapshot.progress, 0.0);

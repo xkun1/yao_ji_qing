@@ -83,7 +83,8 @@ class CompressionUtils {
   }
 
   /// 读取 null 终止的 ASCII 字符串
-  static String _readNullTerminatedAscii(Uint8List bytes, int start, int length) {
+  static String _readNullTerminatedAscii(
+      Uint8List bytes, int start, int length) {
     var end = start;
     final maxEnd = start + length;
     while (end < maxEnd && bytes[end] != 0) {

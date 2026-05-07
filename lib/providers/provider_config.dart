@@ -59,7 +59,8 @@ extension ProviderContext on BuildContext {
   AppState get appState => ProviderConfig.ofApp(this);
 
   /// 获取模型下载状态
-  ModelDownloadState get modelDownloadState => ProviderConfig.ofModelDownload(this);
+  ModelDownloadState get modelDownloadState =>
+      ProviderConfig.ofModelDownload(this);
 
   /// 获取设置状态
   SettingsState get settingsState => ProviderConfig.ofSettings(this);
@@ -68,7 +69,8 @@ extension ProviderContext on BuildContext {
   AppState get watchAppState => ProviderConfig.watchApp(this);
 
   /// 监听模型下载状态
-  ModelDownloadState get watchModelDownloadState => ProviderConfig.watchModelDownload(this);
+  ModelDownloadState get watchModelDownloadState =>
+      ProviderConfig.watchModelDownload(this);
 
   /// 监听设置状态
   SettingsState get watchSettingsState => ProviderConfig.watchSettings(this);

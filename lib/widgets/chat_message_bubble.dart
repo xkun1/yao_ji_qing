@@ -40,22 +40,26 @@ class ChatMessageBubble extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
-        mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment:
+            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!isUser)
-            const ChatAvatar(icon: Icons.psychology_rounded, color: Color(0xFF8B5CF6)),
+            const ChatAvatar(
+                icon: Icons.psychology_rounded, color: Color(0xFF8B5CF6)),
           const SizedBox(width: 12),
           Flexible(
             child: Column(
-              crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              crossAxisAlignment:
+                  isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
               children: [
                 if (imageBytes != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: Image.memory(imageBytes!, width: 200, fit: BoxFit.cover),
+                      child: Image.memory(imageBytes!,
+                          width: 200, fit: BoxFit.cover),
                     ),
                   ),
                 Container(
@@ -98,7 +102,8 @@ class ChatMessageBubble extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           if (isUser)
-            const ChatAvatar(icon: Icons.person_rounded, color: Color(0xFF3B82F6)),
+            const ChatAvatar(
+                icon: Icons.person_rounded, color: Color(0xFF3B82F6)),
         ],
       ),
     );

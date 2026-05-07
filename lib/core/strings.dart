@@ -8,7 +8,7 @@ class AppStrings {
   static const String edit = "编辑";
   static const String finish = "完成";
   static const String close = "关闭";
-  
+
   // 统计页
   static const String statsTitle = "健康统计";
   static const String statsComplianceCardTitle = "本周遵医嘱率";
@@ -23,7 +23,7 @@ class AppStrings {
   static const String statsNoon = "中午 (11-16)";
   static const String statsEvening = "晚上 (16-21)";
   static const String statsNight = "深夜 (21-05)";
-  
+
   // 模型管理页
   static const String modelManagerTitle = "引擎管理";
   static const String modelManagerSubtitle = "管理本地 AI 与语音引擎";
@@ -36,6 +36,7 @@ class AppStrings {
   // 聊天室
   static const String chatAiNotReady = "AI 引擎还没准备好，请先完成模型初始化。";
   static const String chatDeviceNotSupported = "当前设备暂时无法稳定运行药师咨询，请稍后重试。";
-  static const String chatEngineIncompatible = "当前 iOS 推理引擎与模型不兼容，请在模型管理里重新安装当前设备支持的引擎。";
+  static const String chatEngineIncompatible =
+      "当前 iOS 推理引擎与模型不兼容，请在模型管理里重新安装当前设备支持的引擎。";
   static const String chatAiBusy = "本地药师暂时忙不过来，请稍后再试。";
 }

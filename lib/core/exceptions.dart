@@ -1,4 +1,3 @@
-
 /// 统一的异常基类
 class AppException implements Exception {
   const AppException(
@@ -45,7 +44,8 @@ class NetworkException extends AppException {
     );
   }
 
-  factory NetworkException.noConnection({Object? cause, StackTrace? stackTrace}) {
+  factory NetworkException.noConnection(
+      {Object? cause, StackTrace? stackTrace}) {
     return NetworkException(
       '网络连接不可用，请检查网络设置',
       code: 'NO_CONNECTION',
@@ -359,7 +359,8 @@ class ExceptionConverter {
     if (message.contains('no connection') ||
         message.contains('network') ||
         message.contains('internet')) {
-      return NetworkException.noConnection(cause: error, stackTrace: stackTrace);
+      return NetworkException.noConnection(
+          cause: error, stackTrace: stackTrace);
     }
     if (message.contains('server') || message.contains('5')) {
       return NetworkException.serverError(cause: error, stackTrace: stackTrace);

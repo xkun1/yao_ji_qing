@@ -28,9 +28,12 @@ class _ScannerResultEditorState extends State<ScannerResultEditor> {
     super.initState();
     _nameController = TextEditingController(text: widget.result.name);
     _dosageController = TextEditingController(text: widget.result.dosage);
-    _frequencyController = TextEditingController(text: widget.result.frequency.toString());
-    _timesController = TextEditingController(text: widget.result.times.join(', '));
-    _precautionsController = TextEditingController(text: widget.result.precautions);
+    _frequencyController =
+        TextEditingController(text: widget.result.frequency.toString());
+    _timesController =
+        TextEditingController(text: widget.result.times.join(', '));
+    _precautionsController =
+        TextEditingController(text: widget.result.precautions);
   }
 
   @override
@@ -74,7 +77,8 @@ class _ScannerResultEditorState extends State<ScannerResultEditor> {
           ),
           const SizedBox(height: 24),
           _buildField('药名', _nameController, const Key('scanner_name_field')),
-          _buildField('剂量', _dosageController, const Key('scanner_dosage_field')),
+          _buildField(
+              '剂量', _dosageController, const Key('scanner_dosage_field')),
           _buildField(
             '频次',
             _frequencyController,
@@ -146,7 +150,8 @@ class _ScannerResultEditorState extends State<ScannerResultEditor> {
                 );
               },
               style: FilledButton.styleFrom(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
               ),
               child: const Text(
                 '确定，开启提醒',

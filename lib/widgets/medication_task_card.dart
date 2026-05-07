@@ -60,7 +60,7 @@ class MedicationTaskCard extends StatelessWidget {
       width: 52,
       height: 52,
       decoration: BoxDecoration(
-        color: task.isTaken 
+        color: task.isTaken
             ? const Color(0xFF10B981).withValues(alpha: 0.1)
             : const Color(0xFF3B82F6).withValues(alpha: 0.1),
         shape: BoxShape.circle,
@@ -68,7 +68,8 @@ class MedicationTaskCard extends StatelessWidget {
       child: Center(
         child: Icon(
           task.isTaken ? Icons.check_rounded : Icons.access_time_rounded,
-          color: task.isTaken ? const Color(0xFF10B981) : const Color(0xFF3B82F6),
+          color:
+              task.isTaken ? const Color(0xFF10B981) : const Color(0xFF3B82F6),
           size: 26,
         ),
       ),
@@ -126,12 +127,14 @@ class MedicationTaskCard extends StatelessWidget {
       children: [
         IconButton(
           key: editKey,
-          icon: const Icon(Icons.edit_note_rounded, color: Color(0xFF9CA3AF), size: 22),
+          icon: const Icon(Icons.edit_note_rounded,
+              color: Color(0xFF9CA3AF), size: 22),
           onPressed: onEdit,
         ),
         IconButton(
           key: deleteKey,
-          icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFFCA5A5), size: 22),
+          icon: const Icon(Icons.delete_outline_rounded,
+              color: Color(0xFFFCA5A5), size: 22),
           onPressed: onDelete,
         ),
       ],

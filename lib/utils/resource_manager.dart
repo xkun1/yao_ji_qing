@@ -29,7 +29,8 @@ class ResourceManager {
     required DisposeCallback disposeCallback,
     Map<String, dynamic>? metadata,
   }) {
-    final resourceId = '${type}_${name}_${DateTime.now().millisecondsSinceEpoch}';
+    final resourceId =
+        '${type}_${name}_${DateTime.now().millisecondsSinceEpoch}';
     _resources[resourceId] = _ResourceEntry(
       type: type,
       name: name,
@@ -207,7 +208,8 @@ typedef DisposeCallback = void Function();
 class StreamSubscriptionManager {
   StreamSubscriptionManager._internal();
 
-  static final StreamSubscriptionManager _instance = StreamSubscriptionManager._internal();
+  static final StreamSubscriptionManager _instance =
+      StreamSubscriptionManager._internal();
 
   factory StreamSubscriptionManager() => _instance;
 

@@ -68,7 +68,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.initState();
     _currentQuote = _quotes[math.Random().nextInt(_quotes.length)];
     _initData();
-    
+
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 450),
@@ -84,22 +84,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     // 启动引导逻辑
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await SetupGuideScreen.checkAndShow(context);
-      
+
       final prefs = await SharedPreferences.getInstance();
       final bool needGuide = !(prefs.getBool('feature_guide_done_v5') ?? false);
-      
+
       if (needGuide && mounted) {
         // 先构建模拟数据并强制刷新一次 UI
         setState(() {
           _isGuiding = true;
           _guideTask = TodayMedicationTask(
-            medicine: Medicine()..name = "示例药品" ..dosage = "1粒",
-            reminder: Reminder()..hour = 12 ..minute = 0,
+            medicine: Medicine()
+              ..name = "示例药品"
+              ..dosage = "1粒",
+            reminder: Reminder()
+              ..hour = 12
+              ..minute = 0,
             planTime: DateTime.now().copyWith(hour: 12, minute: 0),
             isTaken: false,
           );
         });
-        
+
         await _loadTodayTasks();
         await Future.delayed(const Duration(milliseconds: 200)); // 等待渲染完成
 
@@ -199,10 +203,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         title: const Text("删除用药"),
         content: Text("确定删除「${task.medicine.name}」及其提醒记录吗？"),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("取消")),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("取消")),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444)),
             child: const Text("删除"),
           ),
         ],
@@ -238,15 +245,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       final nextTask = tasks.firstWhere((t) => !t.isTaken);
       await _notifService.updateForegroundService(
         title: "下一顿用药提醒",
-        body: "${nextTask.medicine.name} ${nextTask.medicine.dosage ?? ''} (${nextTask.timeLabel})",
+        body:
+            "${nextTask.medicine.name} ${nextTask.medicine.dosage ?? ''} (${nextTask.timeLabel})",
       );
     }
   }
 
   int get _totalTaskCount => _tasks.length;
   int get _takenTaskCount => _tasks.where((task) => task.isTaken).length;
-  double get _progressValue => _totalTaskCount == 0 ? 0 : _takenTaskCount / _totalTaskCount;
-  bool get _isTodayCompleted => _totalTaskCount > 0 && _takenTaskCount == _totalTaskCount;
+  double get _progressValue =>
+      _totalTaskCount == 0 ? 0 : _takenTaskCount / _totalTaskCount;
+  bool get _isTodayCompleted =>
+      _totalTaskCount > 0 && _takenTaskCount == _totalTaskCount;
 
   TodayMedicationTask? get _nextTask {
     for (final task in _tasks) {
@@ -259,10 +269,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final random = math.Random(20260416);
     final particles = <FireworkParticle>[];
     const centers = [
-      Offset(0.18, 0.18), Offset(0.50, 0.24), Offset(0.82, 0.18),
-      Offset(0.25, 0.50), Offset(0.75, 0.54), Offset(0.50, 0.76),
+      Offset(0.18, 0.18),
+      Offset(0.50, 0.24),
+      Offset(0.82, 0.18),
+      Offset(0.25, 0.50),
+      Offset(0.75, 0.54),
+      Offset(0.50, 0.76),
     ];
-    const colors = [Color(0xFFF97316), Color(0xFFFFD166), Color(0xFF10B981), Color(0xFF3B82F6), Color(0xFFEC4899)];
+    const colors = [
+      Color(0xFFF97316),
+      Color(0xFFFFD166),
+      Color(0xFF10B981),
+      Color(0xFF3B82F6),
+      Color(0xFFEC4899)
+    ];
 
     for (final center in centers) {
       for (var i = 0; i < 28; i++) {
@@ -285,7 +305,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _celebrationController.stop();
     _celebrationController.forward(from: 0);
     _celebrationOverlay?.remove();
-    _celebrationOverlay = OverlayEntry(builder: (context) => _buildCompletionCelebrationOverlay());
+    _celebrationOverlay = OverlayEntry(
+        builder: (context) => _buildCompletionCelebrationOverlay());
     Overlay.of(context).insert(_celebrationOverlay!);
 
     Future.delayed(const Duration(milliseconds: 2400), () {
@@ -309,7 +330,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               child: AnimatedBuilder(
                 animation: _animationController,
                 builder: (context, child) => Container(
-                  color: Colors.black.withValues(alpha: 0.3 * _animationController.value),
+                  color: Colors.black
+                      .withValues(alpha: 0.3 * _animationController.value),
                 ),
               ),
             ),
@@ -381,8 +403,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildArcMenuOverlay() {
-    if (!_isMenuOpen && _animationController.value == 0) return const SizedBox.shrink();
-    
+    if (!_isMenuOpen && _animationController.value == 0)
+      return const SizedBox.shrink();
+
     return Positioned(
       bottom: 60,
       left: 0,
@@ -410,7 +433,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 color: const Color(0xFF8B5CF6),
                 onPressed: () {
                   _toggleMenu();
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const AIChatScreen()));
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const AIChatScreen()));
                 },
               ),
               _buildArcButton(
@@ -439,7 +465,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     const double distance = 110.0;
     final double start = (index / total) * 0.3;
     final double end = (start + 0.7).clamp(0.0, 1.0);
-    
+
     final Animation<double> buttonAnimation = CurvedAnimation(
       parent: _animationController,
       curve: Interval(start, end, curve: Curves.easeOutBack),
@@ -451,10 +477,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       builder: (context, child) {
         final double v = buttonAnimation.value;
         if (v <= 0 && !_isMenuOpen) return const SizedBox.shrink();
-        
+
         final double x = distance * math.cos(angle) * v;
         final double y = distance * math.sin(angle) * v;
-        
+
         return Transform.translate(
           offset: Offset(x, y),
           child: Opacity(
@@ -472,7 +498,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       color: color,
                       shape: BoxShape.circle,
                       boxShadow: [
-                        BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 15, offset: const Offset(0, 8))
+                        BoxShadow(
+                            color: color.withValues(alpha: 0.4),
+                            blurRadius: 15,
+                            offset: const Offset(0, 8))
                       ],
                     ),
                     child: Icon(icon, color: Colors.white, size: 28),
@@ -500,12 +529,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: isActive ? const Color(0xFF3B82F6) : const Color(0xFFD1D5DB), size: 28),
+            Icon(icon,
+                color: isActive
+                    ? const Color(0xFF3B82F6)
+                    : const Color(0xFFD1D5DB),
+                size: 28),
             if (isActive)
               Container(
                 margin: const EdgeInsets.only(top: 4),
-                width: 4, height: 4,
-                decoration: const BoxDecoration(color: Color(0xFF3B82F6), shape: BoxShape.circle),
+                width: 4,
+                height: 4,
+                decoration: const BoxDecoration(
+                    color: Color(0xFF3B82F6), shape: BoxShape.circle),
               )
           ],
         ),
@@ -525,13 +560,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(_currentQuote, style: const TextStyle(color: Color(0xFF1F2937), fontSize: 24, fontWeight: FontWeight.bold)),
+                  Text(_currentQuote,
+                      style: const TextStyle(
+                          color: Color(0xFF1F2937),
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(color: const Color(0xFF10B981).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                    child: Text(nextTask == null ? "今日提醒已完成" : "下次 ${nextTask.timeLabel} · ${nextTask.medicine.name}",
-                      style: const TextStyle(color: Color(0xFF059669), fontSize: 12, fontWeight: FontWeight.bold)),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8)),
+                    child: Text(
+                        nextTask == null
+                            ? "今日提醒已完成"
+                            : "下次 ${nextTask.timeLabel} · ${nextTask.medicine.name}",
+                        style: const TextStyle(
+                            color: Color(0xFF059669),
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
@@ -539,14 +587,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             const SizedBox(width: 16),
             GestureDetector(
               onTap: () async {
-                await Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsScreen()));
+                await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const SettingsScreen()));
                 _loadTodayTasks();
               },
               child: Container(
                 key: _settingsKey,
-                width: 44, height: 44,
-                decoration: const BoxDecoration(color: Color(0xFFEFF6FF), shape: BoxShape.circle),
-                child: const Icon(Icons.settings_rounded, color: Color(0xFF3B82F6), size: 24),
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(
+                    color: Color(0xFFEFF6FF), shape: BoxShape.circle),
+                child: const Icon(Icons.settings_rounded,
+                    color: Color(0xFF3B82F6), size: 24),
               ),
             ),
           ],
@@ -569,29 +623,63 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             key: _progressKey,
             padding: const EdgeInsets.all(28),
             decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFF2563EB)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                gradient: const LinearGradient(
+                    colors: [Color(0xFF3B82F6), Color(0xFF2563EB)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight),
                 borderRadius: BorderRadius.circular(32),
-                boxShadow: [BoxShadow(color: const Color(0xFF3B82F6).withValues(alpha: 0.4), blurRadius: 30, spreadRadius: -5, offset: const Offset(0, 15))]),
+                boxShadow: [
+                  BoxShadow(
+                      color: const Color(0xFF3B82F6).withValues(alpha: 0.4),
+                      blurRadius: 30,
+                      spreadRadius: -5,
+                      offset: const Offset(0, 15))
+                ]),
             child: Row(
               children: [
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(isCompleted ? "今日全部完成" : "今日用药进度", style: const TextStyle(color: Color(0xFFDBEAFE), fontSize: 14)),
+                      Text(isCompleted ? "今日全部完成" : "今日用药进度",
+                          style: const TextStyle(
+                              color: Color(0xFFDBEAFE), fontSize: 14)),
                       const SizedBox(height: 12),
-                      Text("$_takenTaskCount / $_totalTaskCount", style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold)),
+                      Text("$_takenTaskCount / $_totalTaskCount",
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 36,
+                              fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
-                      Text(_totalTaskCount == 0 ? "拍照添加药品后自动生成提醒" : isCompleted ? "点击卡片，再放一次烟花" : "还差 $remainingCount 次，加油哦！",
-                          style: const TextStyle(color: Color(0xFFBFDBFE), fontSize: 12)),
+                      Text(
+                          _totalTaskCount == 0
+                              ? "拍照添加药品后自动生成提醒"
+                              : isCompleted
+                                  ? "点击卡片，再放一次烟花"
+                                  : "还差 $remainingCount 次，加油哦！",
+                          style: const TextStyle(
+                              color: Color(0xFFBFDBFE), fontSize: 12)),
                     ],
                   ),
                 ),
                 Stack(
                   alignment: Alignment.center,
                   children: [
-                    SizedBox(width: 84, height: 84, child: CircularProgressIndicator(value: progress, strokeWidth: 10, strokeCap: StrokeCap.round, backgroundColor: const Color(0x33FFFFFF), valueColor: const AlwaysStoppedAnimation<Color>(Colors.white))),
-                    Text(percentLabel, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                    SizedBox(
+                        width: 84,
+                        height: 84,
+                        child: CircularProgressIndicator(
+                            value: progress,
+                            strokeWidth: 10,
+                            strokeCap: StrokeCap.round,
+                            backgroundColor: const Color(0x33FFFFFF),
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                                Colors.white))),
+                    Text(percentLabel,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold)),
                   ],
                 )
               ],
@@ -606,7 +694,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return const SliverToBoxAdapter(
       child: Padding(
         padding: EdgeInsets.fromLTRB(24, 40, 24, 16),
-        child: Text("今日用药任务：", style: TextStyle(color: Color(0xFF1F2937), fontSize: 18, fontWeight: FontWeight.bold)),
+        child: Text("今日用药任务：",
+            style: TextStyle(
+                color: Color(0xFF1F2937),
+                fontSize: 18,
+                fontWeight: FontWeight.bold)),
       ),
     );
   }
@@ -629,9 +721,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           child: Center(
             child: Column(
               children: [
-                Icon(isAllDone ? Icons.check_circle_outline_rounded : Icons.medication_liquid_rounded, size: 64, color: isAllDone ? const Color(0xFF10B981) : const Color(0xFFE5E7EB)),
+                Icon(
+                    isAllDone
+                        ? Icons.check_circle_outline_rounded
+                        : Icons.medication_liquid_rounded,
+                    size: 64,
+                    color: isAllDone
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFFE5E7EB)),
                 const SizedBox(height: 16),
-                Text(isAllDone ? "您好，今天的药都吃完啦！🌟" : "今天暂时没有用药任务哦", style: TextStyle(color: isAllDone ? const Color(0xFF059669) : const Color(0xFF9CA3AF), fontSize: 16, fontWeight: isAllDone ? FontWeight.bold : FontWeight.normal)),
+                Text(isAllDone ? "您好，今天的药都吃完啦！🌟" : "今天暂时没有用药任务哦",
+                    style: TextStyle(
+                        color: isAllDone
+                            ? const Color(0xFF059669)
+                            : const Color(0xFF9CA3AF),
+                        fontSize: 16,
+                        fontWeight:
+                            isAllDone ? FontWeight.bold : FontWeight.normal)),
               ],
             ),
           ),
@@ -666,7 +772,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         child: AnimatedBuilder(
           animation: _celebrationController,
           builder: (context, child) {
-            return CustomPaint(painter: FireworkPainter(progress: _celebrationController.value, particles: _fireworkParticles), size: Size.infinite);
+            return CustomPaint(
+                painter: FireworkPainter(
+                    progress: _celebrationController.value,
+                    particles: _fireworkParticles),
+                size: Size.infinite);
           },
         ),
       ),

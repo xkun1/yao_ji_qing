@@ -99,7 +99,8 @@ class PathCache {
   /// 刷新缓存
   Future<void> _refreshCache() async {
     try {
-      _applicationDocumentsPath = (await getApplicationDocumentsDirectory()).path;
+      _applicationDocumentsPath =
+          (await getApplicationDocumentsDirectory()).path;
       _applicationSupportPath = (await getApplicationSupportDirectory()).path;
       _temporaryDirectoryPath = (await getTemporaryDirectory()).path;
 

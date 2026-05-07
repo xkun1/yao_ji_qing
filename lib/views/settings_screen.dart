@@ -236,11 +236,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
         title: const Text("语音合成引擎尚未就绪"),
         content: const Text("开启自动播报功能需要先下载语音模型。是否现在前往管理页面？"),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("取消")),
+          TextButton(
+              onPressed: () => Navigator.pop(context), child: const Text("取消")),
           FilledButton(
             onPressed: () {
               Navigator.pop(context);
-              Navigator.push(context, MaterialPageRoute(builder: (context) => const ModelManagerScreen()));
+              Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => const ModelManagerScreen()));
             },
             child: const Text("前往管理"),
           ),
@@ -261,8 +265,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: const Text("取消")),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            style:
-                FilledButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444)),
             child: const Text("确定重置"),
           ),
         ],
@@ -272,7 +276,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (confirmed == true) {
       // 1. 彻底撤回所有系统通知和前台服务
       await NotificationService().cancelAllReminders();
-      
+
       // 2. 仅抹除药品相关的业务数据
       await DatabaseService().isar.writeTxn(() async {
         await DatabaseService().isar.clear();

@@ -15,11 +15,11 @@ class StatsScreen extends StatefulWidget {
 class _StatsScreenState extends State<StatsScreen> {
   final DatabaseService _dbService = DatabaseService();
   bool _isLoading = true;
-  
+
   // 统计数据
   double _complianceRate = 0.0;
   int _totalTaken = 0;
-  
+
   // 按时间段分类的数据
   Map<String, int> _timeBucketStats = {
     AppStrings.statsMorning: 0,
@@ -65,11 +65,13 @@ class _StatsScreenState extends State<StatsScreen> {
     for (var log in logs.where((l) => l.isTaken)) {
       final int hour = log.planTime.hour;
       if (hour >= 5 && hour < 11) {
-        buckets[AppStrings.statsMorning] = buckets[AppStrings.statsMorning]! + 1;
+        buckets[AppStrings.statsMorning] =
+            buckets[AppStrings.statsMorning]! + 1;
       } else if (hour >= 11 && hour < 16) {
         buckets[AppStrings.statsNoon] = buckets[AppStrings.statsNoon]! + 1;
       } else if (hour >= 16 && hour < 21) {
-        buckets[AppStrings.statsEvening] = buckets[AppStrings.statsEvening]! + 1;
+        buckets[AppStrings.statsEvening] =
+            buckets[AppStrings.statsEvening]! + 1;
       } else {
         buckets[AppStrings.statsNight] = buckets[AppStrings.statsNight]! + 1;
       }
@@ -122,7 +124,9 @@ class _StatsScreenState extends State<StatsScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(28),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10)],
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10)
+        ],
       ),
       child: Row(
         children: [
@@ -139,8 +143,9 @@ class _StatsScreenState extends State<StatsScreen> {
                   color: const Color(0xFF10B981),
                 ),
               ),
-              Text("${(_complianceRate * 100).round()}%", 
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text("${(_complianceRate * 100).round()}%",
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 16)),
             ],
           ),
           const SizedBox(width: 24),
@@ -148,11 +153,16 @@ class _StatsScreenState extends State<StatsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text("服药遵从率", style: TextStyle(color: Color(0xFF6B7280), fontSize: 14)),
+                const Text("服药遵从率",
+                    style: TextStyle(color: Color(0xFF6B7280), fontSize: 14)),
                 const SizedBox(height: 4),
-                Text("近 7 天共坚持服药 $_totalTaken 次", 
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1F2937))),
-                const Text("保持这种节奏，坤哥棒棒哒！✨", style: TextStyle(color: Color(0xFF10B981), fontSize: 12)),
+                Text("近 7 天共坚持服药 $_totalTaken 次",
+                    style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1F2937))),
+                const Text("保持这种节奏，坤哥棒棒哒！✨",
+                    style: TextStyle(color: Color(0xFF10B981), fontSize: 12)),
               ],
             ),
           )
@@ -171,7 +181,8 @@ class _StatsScreenState extends State<StatsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("分时段统计", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const Text("分时段统计",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 20),
           ..._timeBucketStats.entries.map((e) {
             final double percent = _totalTaken == 0 ? 0 : e.value / _totalTaken;
@@ -182,8 +193,12 @@ class _StatsScreenState extends State<StatsScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(e.key, style: const TextStyle(fontSize: 13, color: Color(0xFF6B7280))),
-                      Text("${e.value}次", style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                      Text(e.key,
+                          style: const TextStyle(
+                              fontSize: 13, color: Color(0xFF6B7280))),
+                      Text("${e.value}次",
+                          style: const TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.bold)),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -204,12 +219,14 @@ class _StatsScreenState extends State<StatsScreen> {
   }
 
   Widget _buildRecentHistoryHeader() {
-    return const Text("近期服用记录", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold));
+    return const Text("近期服用记录",
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold));
   }
 
   Widget _buildHistoryList() {
     if (_recentLogs.isEmpty) {
-      return const Center(child: Text("暂无服用记录", style: TextStyle(color: Color(0xFF9CA3AF))));
+      return const Center(
+          child: Text("暂无服用记录", style: TextStyle(color: Color(0xFF9CA3AF))));
     }
     return ListView.builder(
       shrinkWrap: true,
@@ -230,21 +247,31 @@ class _StatsScreenState extends State<StatsScreen> {
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
-                decoration: const BoxDecoration(color: Color(0xFFF0FDF4), shape: BoxShape.circle),
-                child: const Icon(Icons.check_rounded, color: Color(0xFF10B981), size: 18),
+                decoration: const BoxDecoration(
+                    color: Color(0xFFF0FDF4), shape: BoxShape.circle),
+                child: const Icon(Icons.check_rounded,
+                    color: Color(0xFF10B981), size: 18),
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(log.medicineName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                    Text("计划时间: $dateStr $timeStr", style: const TextStyle(fontSize: 12, color: Color(0xFF9CA3AF))),
+                    Text(log.medicineName,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 15)),
+                    Text("计划时间: $dateStr $timeStr",
+                        style: const TextStyle(
+                            fontSize: 12, color: Color(0xFF9CA3AF))),
                   ],
                 ),
               ),
               if (log.actualTime != null)
-                const Text("已服", style: TextStyle(color: Color(0xFF10B981), fontSize: 13, fontWeight: FontWeight.bold)),
+                const Text("已服",
+                    style: TextStyle(
+                        color: Color(0xFF10B981),
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold)),
             ],
           ),
         );

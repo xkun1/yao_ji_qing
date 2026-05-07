@@ -229,11 +229,13 @@ class GeminiService {
   }
 
   /// 获取模型状态
-  Future<String?> findExistingModelPath() async => await _chatHandler.findExistingModelPath();
+  Future<String?> findExistingModelPath() async =>
+      await _chatHandler.findExistingModelPath();
 
   Future<String?> findTtsModelPath() async {
     final docsDir = await getApplicationDocumentsDirectory();
-    final path = '${docsDir.path}/${AppConstants.ttsModelsDirName}/${AppConstants.ttsDirName}';
+    final path =
+        '${docsDir.path}/${AppConstants.ttsModelsDirName}/${AppConstants.ttsDirName}';
     return await Directory(path).exists() ? path : null;
   }
 

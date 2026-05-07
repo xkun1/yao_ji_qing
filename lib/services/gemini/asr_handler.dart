@@ -14,15 +14,18 @@ class AsrHandler {
 
   /// 查找 ASR 模型路径
   Future<String?> findModelPath() async {
-    final extDir = Platform.isAndroid ? await getExternalStorageDirectory() : null;
+    final extDir =
+        Platform.isAndroid ? await getExternalStorageDirectory() : null;
     final intDir = await getApplicationDocumentsDirectory();
     final possiblePaths = <String>[];
 
     if (extDir != null) {
-      possiblePaths.add('${extDir.path}/${AppConstants.asrModelsDirName}/${AppConstants.asrDirName}');
+      possiblePaths.add(
+          '${extDir.path}/${AppConstants.asrModelsDirName}/${AppConstants.asrDirName}');
       possiblePaths.add('${extDir.path}/${AppConstants.asrDirName}');
     }
-    possiblePaths.add('${intDir.path}/${AppConstants.asrModelsDirName}/${AppConstants.asrDirName}');
+    possiblePaths.add(
+        '${intDir.path}/${AppConstants.asrModelsDirName}/${AppConstants.asrDirName}');
     possiblePaths.add('${intDir.path}/${AppConstants.asrDirName}');
 
     for (final path in possiblePaths) {
@@ -46,7 +49,8 @@ class AsrHandler {
     var hasDecoder = false;
 
     try {
-      await for (final entity in dir.list(recursive: true, followLinks: false)) {
+      await for (final entity
+          in dir.list(recursive: true, followLinks: false)) {
         if (entity is! File) continue;
         final name = entity.path.split(RegExp(r'[/\\]')).last.toLowerCase();
         final size = await entity.length();

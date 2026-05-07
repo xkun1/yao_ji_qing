@@ -99,7 +99,8 @@ class PerformanceMonitor {
     );
 
     if (kDebugMode) {
-      debugPrint('⏱️ [Performance] 结束计时: ${metric.name} (${duration.inMilliseconds}ms)');
+      debugPrint(
+          '⏱️ [Performance] 结束计时: ${metric.name} (${duration.inMilliseconds}ms)');
     }
   }
 
@@ -117,7 +118,8 @@ class PerformanceMonitor {
   }
 
   /// 异步测量函数执行时间
-  Future<T> measureAsync<T>(String operation, Future<T> Function() function) async {
+  Future<T> measureAsync<T>(
+      String operation, Future<T> Function() function) async {
     final timingId = startTiming(operation);
     try {
       final result = await function();
@@ -131,7 +133,8 @@ class PerformanceMonitor {
 
   /// 获取性能统计
   Map<String, dynamic> getPerformanceStats() {
-    final completedMetrics = _metrics.values.where((m) => m.duration != null).toList();
+    final completedMetrics =
+        _metrics.values.where((m) => m.duration != null).toList();
 
     if (completedMetrics.isEmpty) {
       return {
@@ -142,7 +145,8 @@ class PerformanceMonitor {
       };
     }
 
-    final durations = completedMetrics.map((m) => m.duration!.inMilliseconds).toList();
+    final durations =
+        completedMetrics.map((m) => m.duration!.inMilliseconds).toList();
     durations.sort();
 
     return {
@@ -195,7 +199,8 @@ class PerformanceMonitor {
       return {'operation': operation, 'count': 0};
     }
 
-    final durations = operationMetrics.map((m) => m.duration!.inMilliseconds).toList();
+    final durations =
+        operationMetrics.map((m) => m.duration!.inMilliseconds).toList();
     durations.sort();
 
     return {
@@ -234,7 +239,8 @@ class PerformanceMonitor {
     if (kDebugMode) {
       final stats = getPerformanceStats();
       if (stats['completedMetrics'] > 0) {
-        debugPrint('📊 [Performance] 平均执行时间: ${stats['avgDuration']?.toStringAsFixed(2)}ms');
+        debugPrint(
+            '📊 [Performance] 平均执行时间: ${stats['avgDuration']?.toStringAsFixed(2)}ms');
       }
     }
   }
@@ -297,7 +303,8 @@ class _PerformanceMonitorDialog extends StatefulWidget {
   const _PerformanceMonitorDialog(this.monitor);
 
   @override
-  State<_PerformanceMonitorDialog> createState() => _PerformanceMonitorDialogState();
+  State<_PerformanceMonitorDialog> createState() =>
+      _PerformanceMonitorDialogState();
 }
 
 class _PerformanceMonitorDialogState extends State<_PerformanceMonitorDialog> {
@@ -311,7 +318,8 @@ class _PerformanceMonitorDialogState extends State<_PerformanceMonitorDialog> {
           children: [
             _buildStatSection('总体统计', widget.monitor.getPerformanceStats()),
             const SizedBox(height: 16),
-            _buildEventSection('最近事件', widget.monitor.getRecentEvents(limit: 5)),
+            _buildEventSection(
+                '最近事件', widget.monitor.getRecentEvents(limit: 5)),
           ],
         ),
       ),

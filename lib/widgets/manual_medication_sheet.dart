@@ -64,7 +64,8 @@ class _ManualMedicationSheetState extends State<ManualMedicationSheet> {
     if (time != null) {
       setState(() {
         _times.add(ReminderTime(time.hour, time.minute));
-        _times.sort((a, b) => (a.hour * 60 + a.minute).compareTo(b.hour * 60 + b.minute));
+        _times.sort((a, b) =>
+            (a.hour * 60 + a.minute).compareTo(b.hour * 60 + b.minute));
       });
     }
   }
@@ -72,7 +73,8 @@ class _ManualMedicationSheetState extends State<ManualMedicationSheet> {
   Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
     if (_times.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("请至少设置一个提醒时间")));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text("请至少设置一个提醒时间")));
       return;
     }
 
@@ -96,7 +98,9 @@ class _ManualMedicationSheetState extends State<ManualMedicationSheet> {
       }
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("保存失败: $e")));
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text("保存失败: $e")));
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -109,7 +113,8 @@ class _ManualMedicationSheetState extends State<ManualMedicationSheet> {
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+      padding: EdgeInsets.fromLTRB(
+          24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 24),
       child: SingleChildScrollView(
         child: Form(
           key: _formKey,
@@ -117,13 +122,25 @@ class _ManualMedicationSheetState extends State<ManualMedicationSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
+              Center(
+                  child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2)))),
               const SizedBox(height: 24),
-              Text(_isEditing ? "修改药品" : "手动录入药品", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              Text(_isEditing ? "修改药品" : "手动录入药品",
+                  style: const TextStyle(
+                      fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 24),
               TextFormField(
                 controller: _nameController,
-                decoration: InputDecoration(labelText: "药品名称", hintText: "例如：阿莫西林", border: OutlineInputBorder(borderRadius: BorderRadius.circular(16))),
+                decoration: InputDecoration(
+                    labelText: "药品名称",
+                    hintText: "例如：阿莫西林",
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16))),
                 validator: (v) => (v == null || v.isEmpty) ? "请输入药品名称" : null,
               ),
               const SizedBox(height: 16),
@@ -132,7 +149,11 @@ class _ManualMedicationSheetState extends State<ManualMedicationSheet> {
                   Expanded(
                     child: TextFormField(
                       controller: _dosageController,
-                      decoration: InputDecoration(labelText: "服用剂量", hintText: "例如：2粒", border: OutlineInputBorder(borderRadius: BorderRadius.circular(16))),
+                      decoration: InputDecoration(
+                          labelText: "服用剂量",
+                          hintText: "例如：2粒",
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16))),
                     ),
                   ),
                 ],
@@ -140,11 +161,16 @@ class _ManualMedicationSheetState extends State<ManualMedicationSheet> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _noteController,
-                decoration: InputDecoration(labelText: "医生叮嘱/备注", hintText: "例如：饭后半小时服用", border: OutlineInputBorder(borderRadius: BorderRadius.circular(16))),
+                decoration: InputDecoration(
+                    labelText: "医生叮嘱/备注",
+                    hintText: "例如：饭后半小时服用",
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16))),
                 maxLines: 2,
               ),
               const SizedBox(height: 24),
-              const Text("提醒时间", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const Text("提醒时间",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
@@ -153,19 +179,27 @@ class _ManualMedicationSheetState extends State<ManualMedicationSheet> {
                   ..._times.asMap().entries.map((entry) {
                     final time = entry.value;
                     return Chip(
-                      label: Text("${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}"),
-                      onDeleted: () => setState(() => _times.removeAt(entry.key)),
+                      label: Text(
+                          "${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}"),
+                      onDeleted: () =>
+                          setState(() => _times.removeAt(entry.key)),
                       backgroundColor: const Color(0xFFEFF6FF),
-                      labelStyle: const TextStyle(color: Color(0xFF3B82F6), fontWeight: FontWeight.bold),
+                      labelStyle: const TextStyle(
+                          color: Color(0xFF3B82F6),
+                          fontWeight: FontWeight.bold),
                       deleteIconColor: const Color(0xFF3B82F6),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide.none),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide.none),
                     );
                   }),
                   ActionChip(
                     label: const Icon(Icons.add, size: 20),
                     onPressed: _addTime,
                     backgroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Color(0xFFE5E7EB))),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: const BorderSide(color: Color(0xFFE5E7EB))),
                   ),
                 ],
               ),
@@ -175,8 +209,19 @@ class _ManualMedicationSheetState extends State<ManualMedicationSheet> {
                 height: 52,
                 child: FilledButton(
                   onPressed: _isSaving ? null : _handleSave,
-                  style: FilledButton.styleFrom(backgroundColor: const Color(0xFF3B82F6), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-                  child: _isSaving ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : Text(_isEditing ? "保存修改" : "开启守护提醒", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF3B82F6),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16))),
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2))
+                      : Text(_isEditing ? "保存修改" : "开启守护提醒",
+                          style: const TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ),
               if (_isEditing) ...[
@@ -185,41 +230,63 @@ class _ManualMedicationSheetState extends State<ManualMedicationSheet> {
                   width: double.infinity,
                   height: 52,
                   child: OutlinedButton(
-                    onPressed: _isSaving ? null : () async {
-                      final confirmed = await showDialog<bool>(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: const Text("结束并删除提醒"),
-                          content: Text("确定要结束「${widget.medicine!.name}」的每日提醒吗？相关用药记录也将被永久删除。"),
-                          actions: [
-                            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("取消")),
-                            FilledButton(
-                              onPressed: () => Navigator.pop(context, true), 
-                              style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEF4444)), 
-                              child: const Text("确定结束")
-                            ),
-                          ],
-                        ),
-                      );
-                      
-                      if (confirmed == true && context.mounted) {
-                        setState(() => _isSaving = true);
-                        try {
-                          // 核心：彻底删除，内部已包含 iOS 连环提醒和 Android 止震逻辑
-                          await DatabaseService().deleteMedication(widget.medicine!);
-                          if (context.mounted) Navigator.pop(context, true);
-                        } catch (e) {
-                          if (context.mounted) {
-                            setState(() => _isSaving = false);
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("操作失败: $e")));
-                          }
-                        }
-                      }
-                    },
-                    style: OutlinedButton.styleFrom(side: const BorderSide(color: Color(0xFFFCA5A5)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-                    child: _isSaving 
-                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Color(0xFFEF4444), strokeWidth: 2))
-                      : const Text("结束此药品提醒", style: TextStyle(color: Color(0xFFEF4444), fontSize: 16, fontWeight: FontWeight.bold)),
+                    onPressed: _isSaving
+                        ? null
+                        : () async {
+                            final confirmed = await showDialog<bool>(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Text("结束并删除提醒"),
+                                content: Text(
+                                    "确定要结束「${widget.medicine!.name}」的每日提醒吗？相关用药记录也将被永久删除。"),
+                                actions: [
+                                  TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(context, false),
+                                      child: const Text("取消")),
+                                  FilledButton(
+                                      onPressed: () =>
+                                          Navigator.pop(context, true),
+                                      style: FilledButton.styleFrom(
+                                          backgroundColor:
+                                              const Color(0xFFEF4444)),
+                                      child: const Text("确定结束")),
+                                ],
+                              ),
+                            );
+
+                            if (confirmed == true && context.mounted) {
+                              setState(() => _isSaving = true);
+                              try {
+                                // 核心：彻底删除，内部已包含 iOS 连环提醒和 Android 止震逻辑
+                                await DatabaseService()
+                                    .deleteMedication(widget.medicine!);
+                                if (context.mounted)
+                                  Navigator.pop(context, true);
+                              } catch (e) {
+                                if (context.mounted) {
+                                  setState(() => _isSaving = false);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text("操作失败: $e")));
+                                }
+                              }
+                            }
+                          },
+                    style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFFFCA5A5)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16))),
+                    child: _isSaving
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                                color: Color(0xFFEF4444), strokeWidth: 2))
+                        : const Text("结束此药品提醒",
+                            style: TextStyle(
+                                color: Color(0xFFEF4444),
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],

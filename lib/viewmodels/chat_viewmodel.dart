@@ -234,7 +234,9 @@ class ChatViewModel extends ChangeNotifier {
 
   Function()? _onLiveScroll;
 
-  Future<bool> enterLiveMode(Function(String) onModelMissing, Function() onAsrUnavailable, {Function()? onLiveScroll}) async {
+  Future<bool> enterLiveMode(
+      Function(String) onModelMissing, Function() onAsrUnavailable,
+      {Function()? onLiveScroll}) async {
     _onLiveScroll = onLiveScroll;
     if (_modelState != ModelState.ready) {
       onModelMissing('对话引擎');
@@ -647,10 +649,7 @@ class ChatViewModel extends ChangeNotifier {
         await Future.delayed(Duration.zero);
         final String fileName =
             'chunk_${DateTime.now().microsecondsSinceEpoch}.wav';
-        final audio = tts.generate(
-            text: sanitized,
-            sid: 47,
-            speed: 1.02);
+        final audio = tts.generate(text: sanitized, sid: 47, speed: 1.02);
         final path =
             await _aiService.saveWav(audio.samples, audio.sampleRate, fileName);
         _ttsAudioQueue.add(path);

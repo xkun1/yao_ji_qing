@@ -7,7 +7,9 @@ void main() {
     test('TodayMedicationTask timeLabel format', () {
       final task = TodayMedicationTask(
         medicine: Medicine()..name = 'Test Pill',
-        reminder: Reminder()..hour = 9..minute = 5,
+        reminder: Reminder()
+          ..hour = 9
+          ..minute = 5,
         planTime: DateTime(2026, 4, 30, 9, 5),
         isTaken: false,
       );
@@ -18,7 +20,9 @@ void main() {
     test('TodayMedicationTask timeLabel format double digits', () {
       final task = TodayMedicationTask(
         medicine: Medicine()..name = 'Test Pill',
-        reminder: Reminder()..hour = 14..minute = 30,
+        reminder: Reminder()
+          ..hour = 14
+          ..minute = 30,
         planTime: DateTime(2026, 4, 30, 14, 30),
         isTaken: true,
       );

@@ -116,29 +116,41 @@ class TtsHandler {
     final dataDirPath = await findDataDirPath();
     final phondataPath = await _findTtsPath(AppConstants.ttsPhondataId);
 
-    return await _fileExistsWithMinBytes(modelPath, AppConstants.minTtsModelBytes) &&
-        await _fileExistsWithMinBytes(voicesPath, AppConstants.minTtsVoicesBytes) &&
+    return await _fileExistsWithMinBytes(
+            modelPath, AppConstants.minTtsModelBytes) &&
+        await _fileExistsWithMinBytes(
+            voicesPath, AppConstants.minTtsVoicesBytes) &&
         await _fileExistsWithMinBytes(tokensPath, 1) &&
-        await _fileExistsWithMinBytes(lexiconPath, AppConstants.minTtsLexiconBytes) &&
+        await _fileExistsWithMinBytes(
+            lexiconPath, AppConstants.minTtsLexiconBytes) &&
         dataDirPath != null &&
-        await _fileExistsWithMinBytes(phondataPath, AppConstants.minTtsPhondataBytes);
+        await _fileExistsWithMinBytes(
+            phondataPath, AppConstants.minTtsPhondataBytes);
   }
 
   /// 查找 TTS 路径
   Future<String?> _findTtsPath(String relativePath) async {
-    final extDir = Platform.isAndroid ? await getExternalStorageDirectory() : null;
+    final extDir =
+        Platform.isAndroid ? await getExternalStorageDirectory() : null;
     final intDir = await getApplicationDocumentsDirectory();
     final possiblePaths = <String>[];
 
     if (extDir != null) {
-      possiblePaths.add('${extDir.path}/${AppConstants.ttsDirName}/$relativePath');
-      possiblePaths.add('${extDir.path}/${AppConstants.ttsModelsDirName}/${AppConstants.ttsDirName}/$relativePath');
-      possiblePaths.add('${extDir.path}/${AppConstants.modelsDirName}/${AppConstants.ttsDirName}/$relativePath');
-      possiblePaths.add('${extDir.path}/files/${AppConstants.ttsDirName}/$relativePath');
+      possiblePaths
+          .add('${extDir.path}/${AppConstants.ttsDirName}/$relativePath');
+      possiblePaths.add(
+          '${extDir.path}/${AppConstants.ttsModelsDirName}/${AppConstants.ttsDirName}/$relativePath');
+      possiblePaths.add(
+          '${extDir.path}/${AppConstants.modelsDirName}/${AppConstants.ttsDirName}/$relativePath');
+      possiblePaths
+          .add('${extDir.path}/files/${AppConstants.ttsDirName}/$relativePath');
     }
-    possiblePaths.add('${intDir.path}/${AppConstants.ttsDirName}/$relativePath');
-    possiblePaths.add('${intDir.path}/${AppConstants.ttsModelsDirName}/${AppConstants.ttsDirName}/$relativePath');
-    possiblePaths.add('${intDir.path}/${AppConstants.modelsDirName}/${AppConstants.ttsDirName}/$relativePath');
+    possiblePaths
+        .add('${intDir.path}/${AppConstants.ttsDirName}/$relativePath');
+    possiblePaths.add(
+        '${intDir.path}/${AppConstants.ttsModelsDirName}/${AppConstants.ttsDirName}/$relativePath');
+    possiblePaths.add(
+        '${intDir.path}/${AppConstants.modelsDirName}/${AppConstants.ttsDirName}/$relativePath');
 
     for (final path in possiblePaths) {
       if (await FileSystemEntity.type(path) != FileSystemEntityType.notFound) {

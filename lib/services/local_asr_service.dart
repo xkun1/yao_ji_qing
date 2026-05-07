@@ -24,7 +24,7 @@ class LocalAsrService {
   sherpa.OnlineStream? _stream;
   StreamSubscription? _audioSubscription;
   String? _lastPartialText;
-  
+
   // 新增：音量反馈流
   final _volumeController = StreamController<double>.broadcast();
   Stream<double> get volumeStream => _volumeController.stream;
@@ -160,7 +160,7 @@ class LocalAsrService {
     if (recognizer == null || stream == null || pcmBytes.isEmpty) return;
 
     final samples = _pcm16ToFloat32(pcmBytes);
-    
+
     // 实时计算音量 (真正的 RMS)
     double sum = 0;
     for (final s in samples) {

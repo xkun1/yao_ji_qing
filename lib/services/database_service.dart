@@ -112,7 +112,7 @@ class DatabaseService {
       log
         ..actualTime = DateTime.now()
         ..isTaken = true;
-      
+
       log.medicine.value = task.medicine;
 
       await isar.intakeLogs.put(log);
@@ -121,7 +121,7 @@ class DatabaseService {
 
     // 核心优化：吃完药立刻清掉通知中心的所有残留提醒（特别是 iOS 的连环提醒）
     await _notifService.cancelReminder(task.reminder.id);
-    
+
     // 注意：不再需要在此处调用 scheduleDailyReminder。
     // 因为最初在添加药品时已经通过 Daily 模式排期，系统会自动处理明天的提醒。
     // 手动调用反而可能触发 iOS 本分钟内的残留提醒复活。
@@ -135,7 +135,8 @@ class DatabaseService {
         await _notifService.scheduleDailyReminder(
           id: reminder.id,
           title: "💊 吃药时间到了：${medicine.name}",
-          body: "剂量：${medicine.dosage ?? '按医嘱'} | 注意：${medicine.note ?? '按时吃药'}",
+          body:
+              "剂量：${medicine.dosage ?? '按医嘱'} | 注意：${medicine.note ?? '按时吃药'}",
           hour: reminder.hour,
           minute: reminder.minute,
         );
@@ -180,7 +181,8 @@ class DatabaseService {
   }) async {
     final oldName = medicine.name;
     await medicine.reminders.load();
-    final oldReminderIds = medicine.reminders.map((reminder) => reminder.id).toList();
+    final oldReminderIds =
+        medicine.reminders.map((reminder) => reminder.id).toList();
 
     // 1. 核心修复：修改前，先彻底撤回所有旧通知（包含 iOS 连环提醒组）
     for (final reminderId in oldReminderIds) {
@@ -240,7 +242,7 @@ class DatabaseService {
 
   Future<void> deleteMedication(Medicine medicine) async {
     final id = medicine.id;
-    if (id == Isar.autoIncrement) return; 
+    if (id == Isar.autoIncrement) return;
 
     // 1. 加载并获取所有关联的提醒 ID
     await medicine.reminders.load();
@@ -259,12 +261,12 @@ class DatabaseService {
           .filter()
           .medicine((q) => q.idEqualTo(id))
           .deleteAll();
-      
+
       // 彻底删除关联的提醒规则 (Reminder)
       if (reminderIds.isNotEmpty) {
         await isar.reminders.deleteAll(reminderIds);
       }
-      
+
       // 最后抹除药品对象
       await isar.medicines.delete(id);
     });
@@ -292,7 +294,7 @@ class DatabaseService {
 
     await isar.writeTxn(() async {
       await isar.medicines.put(medicine);
-      
+
       for (final time in times) {
         final reminder = Reminder()
           ..hour = time.hour

@@ -68,7 +68,8 @@ class _FeatureGuideOverlayState extends State<FeatureGuideOverlay> {
 
   Rect _getRect(GlobalKey key) {
     try {
-      final RenderBox? renderBox = key.currentContext?.findRenderObject() as RenderBox?;
+      final RenderBox? renderBox =
+          key.currentContext?.findRenderObject() as RenderBox?;
       if (renderBox == null) return Rect.zero;
       final offset = renderBox.localToGlobal(Offset.zero);
       return offset & renderBox.size;
@@ -167,7 +168,10 @@ class _FeatureGuideOverlayState extends State<FeatureGuideOverlay> {
                   borderRadius: isCircle ? null : BorderRadius.circular(24),
                   border: Border.all(color: const Color(0xFF3B82F6), width: 3),
                   boxShadow: [
-                    BoxShadow(color: const Color(0xFF3B82F6).withValues(alpha: 0.5), blurRadius: 20, spreadRadius: 4)
+                    BoxShadow(
+                        color: const Color(0xFF3B82F6).withValues(alpha: 0.5),
+                        blurRadius: 20,
+                        spreadRadius: 4)
                   ],
                 ),
               ),
@@ -178,22 +182,39 @@ class _FeatureGuideOverlayState extends State<FeatureGuideOverlay> {
           Positioned(
             left: 40,
             right: 40,
-            top: targetRect.top > size.height / 2 ? null : targetRect.bottom + 40,
-            bottom: targetRect.top > size.height / 2 ? (size.height - targetRect.top) + 40 : null,
+            top: targetRect.top > size.height / 2
+                ? null
+                : targetRect.bottom + 40,
+            bottom: targetRect.top > size.height / 2
+                ? (size.height - targetRect.top) + 40
+                : null,
             child: IgnorePointer(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: infoAlign,
                 children: [
-                  Text(title, style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold)),
+                  Text(title,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
                   Text(
-                    desc, 
-                    style: const TextStyle(color: Colors.white70, fontSize: 16, height: 1.5),
-                    textAlign: infoAlign == CrossAxisAlignment.center ? TextAlign.center : (infoAlign == CrossAxisAlignment.start ? TextAlign.left : TextAlign.right),
+                    desc,
+                    style: const TextStyle(
+                        color: Colors.white70, fontSize: 16, height: 1.5),
+                    textAlign: infoAlign == CrossAxisAlignment.center
+                        ? TextAlign.center
+                        : (infoAlign == CrossAxisAlignment.start
+                            ? TextAlign.left
+                            : TextAlign.right),
                   ),
                   const SizedBox(height: 40),
-                  const Text("点击屏幕继续 ➔", style: TextStyle(color: Color(0xFF3B82F6), fontWeight: FontWeight.bold, fontSize: 16)),
+                  const Text("点击屏幕继续 ➔",
+                      style: TextStyle(
+                          color: Color(0xFF3B82F6),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16)),
                 ],
               ),
             ),
@@ -205,7 +226,8 @@ class _FeatureGuideOverlayState extends State<FeatureGuideOverlay> {
             left: 20,
             child: TextButton(
               onPressed: widget.onFinish,
-              child: const Text("跳过引导", style: TextStyle(color: Colors.white54)),
+              child:
+                  const Text("跳过引导", style: TextStyle(color: Colors.white54)),
             ),
           ),
         ],

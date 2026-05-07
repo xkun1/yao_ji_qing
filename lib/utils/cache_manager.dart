@@ -99,7 +99,8 @@ class CacheManager {
   }
 
   /// 设置文件缓存
-  Future<void> setFileCache(String key, List<int> bytes, {Duration? duration}) async {
+  Future<void> setFileCache(String key, List<int> bytes,
+      {Duration? duration}) async {
     try {
       final cacheDir = await getTemporaryDirectory();
       final cacheSubDir = Directory('${cacheDir.path}/cache');
@@ -228,7 +229,8 @@ class CacheManager {
     final entries = _memoryCache.entries.toList()
       ..sort((a, b) => a.value.createdAt.compareTo(b.value.createdAt));
 
-    final toRemove = entries.take(_memoryCache.length - _maxMemoryCacheSize + 1);
+    final toRemove =
+        entries.take(_memoryCache.length - _maxMemoryCacheSize + 1);
     for (final entry in toRemove) {
       _removeMemoryCache(entry.key);
     }

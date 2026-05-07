@@ -32,7 +32,8 @@ class ModelDownloader {
   factory ModelDownloader() => _instance;
 
   final _progressController = StreamController<TaskUpdate>.broadcast();
-  ModelDownloadSnapshot _downloadSnapshot = const ModelDownloadSnapshot(isActive: false);
+  ModelDownloadSnapshot _downloadSnapshot =
+      const ModelDownloadSnapshot(isActive: false);
 
   Stream<TaskUpdate> get downloadUpdates => _progressController.stream;
   ModelDownloadSnapshot get downloadSnapshot => _downloadSnapshot;
@@ -126,7 +127,8 @@ class ModelDownloader {
           return;
         }
         lastResult = result;
-        debugPrint('$modelName下载失败，尝试备用地址: ${result.status}, ${result.exception}');
+        debugPrint(
+            '$modelName下载失败，尝试备用地址: ${result.status}, ${result.exception}');
       }
 
       if (lastResult == null) {
@@ -152,8 +154,12 @@ class ModelDownloader {
       directory: directory,
       baseDirectory: BaseDirectory.applicationDocuments,
       updates: Updates.statusAndProgress,
-      chunks: isGemma ? AppConstants.gemmaDownloadChunks : AppConstants.defaultDownloadChunks,
-      retries: isGemma ? AppConstants.gemmaDownloadRetries : AppConstants.defaultDownloadRetries,
+      chunks: isGemma
+          ? AppConstants.gemmaDownloadChunks
+          : AppConstants.defaultDownloadChunks,
+      retries: isGemma
+          ? AppConstants.gemmaDownloadRetries
+          : AppConstants.defaultDownloadRetries,
       allowPause: false,
     );
   }
@@ -168,10 +174,10 @@ class ModelDownloader {
     final type = _getTypeFromFilename(update.task.filename);
     if (type == null) return;
 
-    final currentProgress = _downloadSnapshot.type == type
-        ? _downloadSnapshot.progress
-        : -1.0;
-    final progress = update.status == TaskStatus.complete ? 1.0 : currentProgress;
+    final currentProgress =
+        _downloadSnapshot.type == type ? _downloadSnapshot.progress : -1.0;
+    final progress =
+        update.status == TaskStatus.complete ? 1.0 : currentProgress;
     setDownloadStage(
       type,
       progress,
@@ -265,7 +271,8 @@ class ModelDownloader {
   }
 
   /// 获取文件名对应的下载快照
-  ModelDownloadSnapshot? getSnapshotForFilename(String filename, {double progress = -1}) {
+  ModelDownloadSnapshot? getSnapshotForFilename(String filename,
+      {double progress = -1}) {
     final type = _getTypeFromFilename(filename);
     if (type == null) return null;
     return ModelDownloadSnapshot(
