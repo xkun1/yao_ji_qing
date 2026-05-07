@@ -4,7 +4,8 @@ import 'dart:io';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:background_downloader/background_downloader.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_gemma/flutter_gemma.dart';
+import '../core/exceptions.dart';
+
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -224,7 +225,7 @@ class ChatViewModel extends ChangeNotifier {
     } catch (e) {
       _isDownloading = false;
       notifyListeners();
-      final errorMsg = e is GeminiChatException ? e.userMessage : e.toString();
+      final errorMsg = e is ModelException ? e.userMessage : e.toString();
       if (errorMsg.contains('安装完成')) {
         onInstallationComplete(errorMsg);
       }
@@ -422,7 +423,7 @@ class ChatViewModel extends ChangeNotifier {
     } catch (e) {
       if (_isLiveMode) {
         final errorMsg =
-            e is GeminiChatException ? e.userMessage : '本地药师暂时忙不过来，请稍后再试。';
+            e is ModelException ? e.userMessage : '本地药师暂时忙不过来，请稍后再试。';
         _liveStatus = '出现错误，重试中...';
         _liveAiResponse = errorMsg;
         _setError(errorMsg);
@@ -490,7 +491,7 @@ class ChatViewModel extends ChangeNotifier {
       _isTyping = false;
       _currentAiResponse = '';
       final errorMsg =
-          e is GeminiChatException ? e.userMessage : '本地药师暂时忙不过来，请稍后再试。';
+          e is ModelException ? e.userMessage : '本地药师暂时忙不过来，请稍后再试。';
       _setError(errorMsg);
       notifyListeners();
       scheduleModelRelease();
@@ -548,19 +549,19 @@ class ChatViewModel extends ChangeNotifier {
     }
   }
 
-  List<Message> _getOptimizedHistory() {
+  List<ChatMessage> _getOptimizedHistory() {
     if (_messages.length <= 1) return [];
     final int start = _messages.length > 6 ? _messages.length - 6 : 1;
     final List<AIChatMessage> recentOnes = _messages.sublist(start);
     if (recentOnes.isNotEmpty && recentOnes.last.isUser) {
       recentOnes.removeLast();
     }
-    final List<Message> optimized = [];
+    final List<ChatMessage> optimized = [];
     int totalChars = 0;
     for (var i = recentOnes.length - 1; i >= 0; i--) {
       final msg = recentOnes[i];
       if (totalChars + msg.text.length > 800) break;
-      optimized.insert(0, Message(text: msg.text, isUser: msg.isUser));
+      optimized.insert(0, ChatMessage(text: msg.text, isUser: msg.isUser));
       totalChars += msg.text.length;
     }
     return optimized;
@@ -648,7 +649,7 @@ class ChatViewModel extends ChangeNotifier {
             'chunk_${DateTime.now().microsecondsSinceEpoch}.wav';
         final audio = tts.generate(
             text: sanitized,
-            sid: GeminiService.sweetFemaleVoiceSid,
+            sid: 47,
             speed: 1.02);
         final path =
             await _aiService.saveWav(audio.samples, audio.sampleRate, fileName);

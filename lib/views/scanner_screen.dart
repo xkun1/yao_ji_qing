@@ -1,7 +1,8 @@
 import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import '../services/gemini_service.dart';
 import '../services/database_service.dart';
 import 'package:background_downloader/background_downloader.dart';
@@ -105,25 +106,17 @@ class _ScannerScreenState extends State<ScannerScreen> {
       });
     }
 
-    final InputImage inputImage = InputImage.fromFilePath(image.path);
-    final textRecognizer = TextRecognizer(script: TextRecognitionScript.chinese);
-    String extractedText = "";
+    final Uint8List imageBytes;
     try {
-      final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
-      extractedText = recognizedText.text;
+      imageBytes = await image.readAsBytes();
     } catch (e) {
-      debugPrint("OCR Error: $e");
-    } finally {
-      textRecognizer.close();
-    }
-
-    if (extractedText.trim().isEmpty) {
+      debugPrint("读取图片失败: $e");
       if (mounted) {
         setState(() {
           _isProcessing = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("未能从图片中提取到有效文字，请确保医嘱清晰可见。")),
+          const SnackBar(content: Text("未能读取图片数据，请重试。")),
         );
       }
       return;
@@ -131,12 +124,12 @@ class _ScannerScreenState extends State<ScannerScreen> {
 
     if (mounted) {
       setState(() {
-        _streamingText = "正在唤醒智慧药师提取核心信息...\n\n识别到的内容摘要：\n${extractedText.length > 50 ? '${extractedText.substring(0, 50)}...' : extractedText}\n\n正在分析...";
+        _streamingText = "正在唤醒智慧药师提取核心信息...\n\n正在分析原图...";
       });
     }
 
     final info = await _geminiService.extractMedicationInfo(
-      extractedText,
+      imageBytes,
       onStream: (text) {
         if (mounted) {
           setState(() => _streamingText = text);

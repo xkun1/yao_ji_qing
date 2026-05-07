@@ -3,8 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/constants.dart';
 import '../core/exceptions.dart';
-import '../services/gemini_service_new.dart';
-import '../services/gemini/chat_handler.dart' show ModelState;
+import '../services/gemini_service.dart';
 
 /// 应用状态管理
 class AppState extends ChangeNotifier {

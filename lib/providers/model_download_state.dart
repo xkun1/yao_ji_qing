@@ -4,8 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import '../core/constants.dart';
-import '../services/gemini_service_new.dart';
-import '../services/gemini/model_downloader.dart' show ModelDownloadSnapshot;
+import '../services/gemini_service.dart';
 
 /// 模型下载状态管理
 class ModelDownloadState extends ChangeNotifier {

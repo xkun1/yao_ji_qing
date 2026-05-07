@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:background_downloader/background_downloader.dart';
 
 import '../services/gemini_service.dart';
+import '../core/exceptions.dart';
+
 
 class ModelManagerScreen extends StatefulWidget {
   const ModelManagerScreen({super.key});
@@ -437,7 +439,7 @@ class _ModelManagerScreenState extends State<ModelManagerScreen> {
     } catch (e) {
       if (mounted) {
         final errorMsg =
-            e is GeminiChatException ? e.userMessage : e.toString();
+            e is ModelException ? e.userMessage : e.toString();
         if (errorMsg.contains('安装完成') || errorMsg.contains('iOS 调试模式限制')) {
           showDialog(
             context: context,
