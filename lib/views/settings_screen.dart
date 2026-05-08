@@ -1,25 +1,20 @@
 import 'package:flutter/material.dart';
-import 'setup_guide_screen.dart';
-import 'model_manager_screen.dart';
-import 'about_screen.dart';
-import 'privacy_policy_screen.dart';
-import 'license_screen.dart';
+import '../providers/provider_config.dart';
 import '../services/database_service.dart';
 import '../services/gemini_service.dart';
 import '../services/notification_service.dart';
+import 'about_screen.dart';
+import 'license_screen.dart';
+import 'model_manager_screen.dart';
+import 'privacy_policy_screen.dart';
+import 'setup_guide_screen.dart';
 
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
-}
-
-class _SettingsScreenState extends State<SettingsScreen> {
-  final GeminiService _aiService = GeminiService();
-
-  @override
   Widget build(BuildContext context) {
+    final settingsState = context.watchSettingsState;
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       appBar: AppBar(
@@ -52,21 +47,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 subtitle: const Text("开启后，药师的回复将自动进行实时语音播报",
                     style: TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
                 activeThumbColor: const Color(0xFF10B981),
-                value: _aiService.autoSpeak,
+                value: settingsState.autoSpeak,
                 onChanged: (bool value) async {
                   if (value) {
-                    // 开启时，检查 TTS 模型是否已就绪
-                    final ttsExist = await _aiService.checkTtsFilesExist();
+                    final ttsExist =
+                        await GeminiService().checkTtsFilesExist();
                     if (!ttsExist) {
-                      if (mounted) {
-                        _showTtsMissingDialog();
+                      if (context.mounted) {
+                        _showTtsMissingDialog(context);
                       }
                       return;
                     }
                   }
-                  setState(() {
-                    _aiService.autoSpeak = value;
-                  });
+                  settingsState.setAutoSpeak(value);
                 },
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
@@ -229,7 +222,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _showTtsMissingDialog() {
+  void _showTtsMissingDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(

@@ -1,12 +1,8 @@
-import 'dart:async';
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:background_downloader/background_downloader.dart';
 
-import '../services/gemini_service.dart';
-import '../core/constants.dart';
 import '../core/exceptions.dart';
+import '../providers/provider_config.dart';
+import '../services/gemini_service.dart';
 
 class ModelManagerScreen extends StatefulWidget {
   const ModelManagerScreen({super.key});
@@ -16,174 +12,23 @@ class ModelManagerScreen extends StatefulWidget {
 }
 
 class _ModelManagerScreenState extends State<ModelManagerScreen> {
-  final GeminiService _aiService = GeminiService();
-
   bool _initialLoading = true;
-  bool _gemmaReady = false;
-  ModelState _gemmaState = ModelState.none;
-  bool _asrReady = false;
-  bool _ttsReady = false;
-
-  String _gemmaSize = '';
-  String _asrSize = '';
-  String _ttsSize = '';
-
-  bool _isProcessing = false;
-  String? _downloadingType;
-  double _downloadProgress = 0;
-  String _downloadStatus = '';
-  StreamSubscription<TaskUpdate>? _downloadSubscription;
 
   @override
   void initState() {
     super.initState();
-    _listenDownloadProgress();
-    _restoreDownloadSnapshot();
-    _refreshStatus();
+    _initStatus();
   }
 
-  @override
-  void dispose() {
-    _downloadSubscription?.cancel();
-    super.dispose();
-  }
-
-  void _listenDownloadProgress() {
-    _downloadSubscription = _aiService.downloadUpdates.listen((update) {
-      if (!mounted) return;
-
-      final snapshot = _aiService.modelDownloadSnapshot;
-      if (!snapshot.isActive) return;
-
-      _applyDownloadSnapshot(snapshot);
-    });
-  }
-
-  void _restoreDownloadSnapshot() {
-    final snapshot = _aiService.modelDownloadSnapshot;
-    if (snapshot.isActive) {
-      _applyDownloadSnapshot(snapshot);
-      return;
-    }
-
-    unawaited(_restoreNativeActiveDownload());
-  }
-
-  void _applyDownloadSnapshot(ModelDownloadSnapshot snapshot) {
-    if (!mounted) return;
-    setState(() {
-      _isProcessing = true;
-      _downloadingType = snapshot.type;
-      _downloadProgress = snapshot.progress;
-      _downloadStatus = snapshot.status;
-    });
-  }
-
-  Future<void> _restoreNativeActiveDownload() async {
-    try {
-      final tasks = await FileDownloader().allTasks(allGroups: true);
-      if (!mounted) return;
-
-      for (final task in tasks) {
-        // 如果对应模型文件已存在，取消残留下载任务
-        final modelPath = await _aiService.findExistingModelPath();
-        if (task.filename == AppConstants.gemmaModelId && modelPath != null) {
-          await FileDownloader().cancelTaskWithId(task.taskId);
-          continue;
-        }
-        final asrReady = await _aiService.checkAsrFilesExist();
-        if (task.filename == AppConstants.asrArchiveId && asrReady) {
-          await FileDownloader().cancelTaskWithId(task.taskId);
-          continue;
-        }
-        final ttsReady = await _aiService.checkTtsFilesExist();
-        if (task.filename == AppConstants.ttsArchiveId && ttsReady) {
-          await FileDownloader().cancelTaskWithId(task.taskId);
-          continue;
-        }
-
-        final snapshot = _aiService.downloadSnapshotForFilename(task.filename);
-        if (snapshot != null) {
-          _applyDownloadSnapshot(snapshot);
-          return;
-        }
-      }
-    } catch (_) {
-      // 后台任务查询失败不影响模型状态检测。
-    }
-  }
-
-  Future<void> _refreshStatus() async {
-    try {
-      final gState = await _aiService.getModelState();
-      final gModelPath = await _aiService.findExistingModelPath();
-      final gReady = gState == ModelState.ready && gModelPath != null;
-      final aReady = await _aiService.checkAsrFilesExist();
-      final tReady = await _aiService.checkTtsFilesExist();
-
-      final String gSize =
-          gModelPath == null ? '未下载' : await _getFileSize(gModelPath);
-      final String aSize = aReady
-          ? await _getDirSize(await _aiService.getAsrModelPathForDeletion())
-          : '未下载';
-
-      String tSize = '未下载';
-      if (tReady) {
-        final ttsPath = await _aiService.findTtsModelPath();
-        if (ttsPath != null) {
-          tSize = await _getDirSize(Directory(ttsPath).parent.path);
-        }
-      }
-
-      if (mounted) {
-        setState(() {
-          _gemmaReady = gReady;
-          _gemmaState = gState;
-          _asrReady = aReady;
-          _ttsReady = tReady;
-          _gemmaSize = gSize;
-          _asrSize = aSize;
-          _ttsSize = tSize;
-        });
-      }
-    } catch (e) {
-      debugPrint('刷新模型状态失败: $e');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _initialLoading = false;
-        });
-      }
-    }
-  }
-
-  Future<String> _getFileSize(String path) async {
-    final file = File(path);
-    if (await file.exists()) {
-      final bytes = await file.length();
-      return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
-    }
-    return '未下载';
-  }
-
-  Future<String> _getDirSize(String path) async {
-    final dir = Directory(path);
-    if (await dir.exists()) {
-      int totalSize = 0;
-      try {
-        await for (var file in dir.list(recursive: true, followLinks: false)) {
-          if (file is File) {
-            totalSize += await file.length();
-          }
-        }
-      } catch (_) {}
-      return '${(totalSize / (1024 * 1024)).toStringAsFixed(1)} MB';
-    }
-    return '未下载';
+  Future<void> _initStatus() async {
+    await context.modelDownloadState.refreshStatus();
+    if (mounted) setState(() => _initialLoading = false);
   }
 
   @override
   Widget build(BuildContext context) {
+    final state = context.watchModelDownloadState;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       appBar: AppBar(
@@ -199,12 +44,12 @@ class _ModelManagerScreenState extends State<ModelManagerScreen> {
                 _buildModelCard(
                   title: "对话引擎 (Gemma 4)",
                   subtitle: "本地大语言模型，负责理解与回复",
-                  size: _gemmaSize,
-                  isReady: _gemmaReady,
-                  modelState: _gemmaState,
-                  isDownloading: _downloadingType == 'gemma',
-                  downloadProgress: _downloadProgress,
-                  downloadStatus: _downloadStatus,
+                  size: state.gemmaSize,
+                  isReady: state.gemmaReady,
+                  modelState: state.gemmaState,
+                  isDownloading: state.isDownloadingType('gemma'),
+                  downloadProgress: state.downloadProgress,
+                  downloadStatus: state.downloadStatus,
                   icon: Icons.psychology_rounded,
                   color: const Color(0xFF3B82F6),
                   onDownload: () => _handleDownload('gemma'),
@@ -214,11 +59,11 @@ class _ModelManagerScreenState extends State<ModelManagerScreen> {
                 _buildModelCard(
                   title: "语音识别 (ASR)",
                   subtitle: "本地流式语音识别，负责听懂您的话",
-                  size: _asrSize,
-                  isReady: _asrReady,
-                  isDownloading: _downloadingType == 'asr',
-                  downloadProgress: _downloadProgress,
-                  downloadStatus: _downloadStatus,
+                  size: state.asrSize,
+                  isReady: state.asrReady,
+                  isDownloading: state.isDownloadingType('asr'),
+                  downloadProgress: state.downloadProgress,
+                  downloadStatus: state.downloadStatus,
                   icon: Icons.mic_rounded,
                   color: const Color(0xFF8B5CF6),
                   onDownload: () => _handleDownload('asr'),
@@ -228,11 +73,11 @@ class _ModelManagerScreenState extends State<ModelManagerScreen> {
                 _buildModelCard(
                   title: "语音合成 (TTS)",
                   subtitle: "本地甜美女声合成，负责为您播报",
-                  size: _ttsSize,
-                  isReady: _ttsReady,
-                  isDownloading: _downloadingType == 'tts',
-                  downloadProgress: _downloadProgress,
-                  downloadStatus: _downloadStatus,
+                  size: state.ttsSize,
+                  isReady: state.ttsReady,
+                  isDownloading: state.isDownloadingType('tts'),
+                  downloadProgress: state.downloadProgress,
+                  downloadStatus: state.downloadStatus,
                   icon: Icons.record_voice_over_rounded,
                   color: const Color(0xFF10B981),
                   onDownload: () => _handleDownload('tts'),
@@ -384,7 +229,7 @@ class _ModelManagerScreenState extends State<ModelManagerScreen> {
                 children: [
                   if (isReady)
                     TextButton.icon(
-                      onPressed: _isProcessing ? null : onDelete,
+                      onPressed: (isDownloading) ? null : onDelete,
                       icon: const Icon(
                         Icons.delete_outline_rounded,
                         color: Color(0xFFEF4444),
@@ -416,7 +261,7 @@ class _ModelManagerScreenState extends State<ModelManagerScreen> {
                     ),
                   if (!isReady)
                     FilledButton.icon(
-                      onPressed: _isProcessing ? null : onDownload,
+                      onPressed: (isDownloading) ? null : onDownload,
                       icon: Icon(
                         isDownloading
                             ? Icons.cloud_download_rounded
@@ -447,22 +292,8 @@ class _ModelManagerScreenState extends State<ModelManagerScreen> {
   }
 
   void _handleDownload(String type) async {
-    setState(() {
-      _isProcessing = true;
-      _downloadingType = type;
-      _downloadProgress = 0;
-      _downloadStatus = '正在准备下载...';
-    });
     try {
-      if (type == 'gemma') {
-        await _aiService.downloadModel();
-      } else if (type == 'asr') {
-        await _aiService.downloadAsrModel();
-      } else if (type == 'tts') {
-        await _aiService.downloadTtsModel();
-      }
-
-      // 如果运行到这里还没有重启（虽然 service 内部可能已经触发），我们手动检查并提示
+      await context.modelDownloadState.downloadModel(type);
       if (mounted) {
         showDialog(
           context: context,
@@ -510,16 +341,6 @@ class _ModelManagerScreenState extends State<ModelManagerScreen> {
           );
         }
       }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isProcessing = false;
-          _downloadingType = null;
-          _downloadProgress = 0;
-          _downloadStatus = '';
-        });
-      }
-      _refreshStatus();
     }
   }
 
@@ -545,25 +366,11 @@ class _ModelManagerScreenState extends State<ModelManagerScreen> {
     );
 
     if (confirmed == true) {
-      setState(() => _isProcessing = true);
-      if (type == 'gemma') {
-        final path = await _aiService.getModelPathForDeletion();
-        final file = File(path);
-        if (await file.exists()) await file.delete();
-      } else if (type == 'asr') {
-        await _aiService.deleteAsrModel();
-      } else if (type == 'tts') {
-        await _aiService.deleteTtsModel();
-      }
-
-      await _refreshStatus();
-      setState(() => _isProcessing = false);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("模型已彻底清理")),
-        );
-      }
+      await context.modelDownloadState.deleteModel(type);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("模型已彻底清理")),
+      );
     }
   }
 }

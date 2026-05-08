@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:yao_ji_qing/services/gemini_service.dart';
+import 'package:provider/provider.dart';
 
+import 'providers/app_state.dart';
+import 'providers/model_download_state.dart';
+import 'providers/settings_state.dart';
 import 'services/database_service.dart';
+import 'services/gemini_service.dart';
 import 'services/notification_service.dart';
 import 'views/splash_screen.dart';
 
@@ -22,7 +26,7 @@ void main() async {
   final dbService = DatabaseService();
   await dbService.init();
 
-  // 加载 AI 设置、清理残留下载任务并初始化引擎
+  // 初始化 AI 引擎（清理残留任务 + 加载设置 + ensureInitialized）
   final geminiService = GeminiService();
   await geminiService.init();
 
@@ -34,33 +38,44 @@ class YaoJiQingApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: '药记清',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF3B82F6),
-          primary: const Color(0xFF3B82F6),
-          onPrimary: Colors.white,
-          secondary: const Color(0xFF10B981),
-          surface: const Color(0xFFFFFFFF),
-          surfaceContainerHighest: const Color(0xFFF9FAFB),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<SettingsState>(
+          create: (_) => SettingsState()..init(),
         ),
-        scaffoldBackgroundColor: const Color(0xFFF9FAFB),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.white,
-          elevation: 0,
-          centerTitle: true,
-          titleTextStyle: TextStyle(
-            color: Color(0xFF1F2937),
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
+        ChangeNotifierProvider<AppState>(create: (_) => AppState()),
+        ChangeNotifierProvider<ModelDownloadState>(
+          create: (_) => ModelDownloadState()..init(),
+        ),
+      ],
+      child: MaterialApp(
+        title: '药记清',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          useMaterial3: true,
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFF3B82F6),
+            primary: const Color(0xFF3B82F6),
+            onPrimary: Colors.white,
+            secondary: const Color(0xFF10B981),
+            surface: const Color(0xFFFFFFFF),
+            surfaceContainerHighest: const Color(0xFFF9FAFB),
           ),
-          iconTheme: IconThemeData(color: Color(0xFF1F2937)),
+          scaffoldBackgroundColor: const Color(0xFFF9FAFB),
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            centerTitle: true,
+            titleTextStyle: TextStyle(
+              color: Color(0xFF1F2937),
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+            iconTheme: IconThemeData(color: Color(0xFF1F2937)),
+          ),
         ),
+        home: const SplashScreen(),
       ),
-      home: const SplashScreen(),
     );
   }
 }
