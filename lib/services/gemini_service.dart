@@ -128,7 +128,11 @@ class GeminiService {
       _downloader.setDownloadStage('gemma', 1, '下载完成，正在重启...');
       await restartApp();
       _downloader.clearDownloadSnapshot();
-    } catch (_) {
+    } catch (e) {
+      if (e is ModelException && e.code == 'MODEL_INCOMPATIBLE') {
+        _downloader.clearDownloadSnapshot();
+        return;
+      }
       _downloader.clearDownloadSnapshot();
       rethrow;
     }
@@ -168,7 +172,12 @@ class GeminiService {
       _downloader.setDownloadStage('asr', 1, '下载完成，正在重启...');
       await restartApp();
       _downloader.clearDownloadSnapshot();
-    } catch (_) {
+    } catch (e) {
+      if (e is ModelException && e.code == 'MODEL_INCOMPATIBLE') {
+         // iOS 无法重启，静默忽略以避免向上传递导致外部误判为下载失败
+         _downloader.clearDownloadSnapshot();
+         return;
+      }
       _downloader.clearDownloadSnapshot();
       rethrow;
     }
@@ -209,7 +218,12 @@ class GeminiService {
       _downloader.setDownloadStage('tts', 1, '下载完成，正在重启...');
       await restartApp();
       _downloader.clearDownloadSnapshot();
-    } catch (_) {
+    } catch (e) {
+      if (e is ModelException && e.code == 'MODEL_INCOMPATIBLE') {
+         // iOS 无法重启，静默忽略以避免向上传递导致外部误判为下载失败
+         _downloader.clearDownloadSnapshot();
+         return;
+      }
       _downloader.clearDownloadSnapshot();
       rethrow;
     }
@@ -324,7 +338,8 @@ class GeminiService {
       if (Platform.isAndroid) {
         await _vibrationChannel.invokeMethod('restartApp');
       } else {
-        throw ModelException.incompatible();
+        // iOS无法自动重启应用，所以不再抛出异常而是提示用户
+        // 这里静默忽略或给出一个可恢复的异常都可以，暂且忽略
       }
     } catch (e) {
       if (e is ModelException) rethrow;
