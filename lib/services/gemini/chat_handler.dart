@@ -185,6 +185,8 @@ class ChatHandler {
       } else {
         _cachedBackend = PreferredBackend.gpu;
       }
+    } else if (Platform.isIOS) {
+      _cachedBackend = PreferredBackend.cpu;
     } else {
       _cachedBackend = PreferredBackend.gpu;
     }
