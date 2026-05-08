@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../core/strings.dart';
 import '../models/medicine.dart';
@@ -187,10 +188,25 @@ class _StatsScreenState extends State<StatsScreen> {
         elevation: 0,
         actions: [
           if (!_isLoading)
-            IconButton(
-              icon: const Icon(Icons.ios_share_rounded),
-              tooltip: '导出服药记录',
-              onPressed: _exportCsv,
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: GestureDetector(
+                onTap: _exportCsv,
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF3B82F6).withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: SvgPicture.asset(
+                    'assets/icons/share.svg',
+                    colorFilter: const ColorFilter.mode(Color(0xFF3B82F6), BlendMode.srcIn),
+                    width: 22,
+                    height: 22,
+                  ),
+                ),
+              ),
             ),
         ],
       ),
@@ -520,11 +536,32 @@ class _StatsScreenState extends State<StatsScreen> {
       children: [
         const Text("近期服用记录",
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        TextButton.icon(
-          onPressed: _exportCsv,
-          icon: const Icon(Icons.download_rounded, size: 16),
-          label: const Text("导出CSV",
-              style: TextStyle(fontSize: 12, color: Color(0xFF3B82F6))),
+        GestureDetector(
+          onTap: _exportCsv,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF6FF),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SvgPicture.asset(
+                  'assets/icons/share.svg',
+                  width: 16,
+                  height: 16,
+                  colorFilter: const ColorFilter.mode(Color(0xFF3B82F6), BlendMode.srcIn),
+                ),
+                const SizedBox(width: 6),
+                const Text("导出CSV",
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF3B82F6),
+                        fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
         ),
       ],
     );
