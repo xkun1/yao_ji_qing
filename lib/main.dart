@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import 'core/routes.dart';
 import 'providers/app_state.dart';
 import 'providers/model_download_state.dart';
 import 'providers/settings_state.dart';
@@ -75,6 +76,7 @@ class YaoJiQingApp extends StatelessWidget {
           ),
         ),
         home: const SplashScreen(),
+        onGenerateRoute: AppRoutes.generateRoute,
       ),
     );
   }

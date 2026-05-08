@@ -7,6 +7,7 @@ import '../services/gemini_service.dart';
 import '../services/database_service.dart';
 import 'package:background_downloader/background_downloader.dart';
 import '../widgets/scanner_result_editor.dart';
+import '../widgets/animations.dart';
 import 'model_manager_screen.dart';
 
 class ScannerScreen extends StatefulWidget {
@@ -258,13 +259,12 @@ class _ScannerScreenState extends State<ScannerScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const CircularProgressIndicator(strokeWidth: 6),
-          const SizedBox(height: 32),
-          const Text("本地 AI 正在精读医嘱...",
-              style: TextStyle(
-                  color: Color(0xFF3B82F6), fontWeight: FontWeight.bold)),
+          const MedicinePulseLoader(
+            message: 'AI 正在解析药方',
+            size: 100,
+          ),
           const SizedBox(height: 24),
-          // 坤哥，这里设为固定高度 250 并支持自动滚动
+          // 流式文字显示区域
           Container(
             width: double.infinity,
             height: 250,

@@ -27,19 +27,11 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller.forward();
 
-    // 1.8秒后自动进入主页
+    // 2.2秒后自动进入主页
     Future.delayed(const Duration(milliseconds: 2200), () {
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) =>
-                const HomeScreen(),
-            transitionsBuilder:
-                (context, animation, secondaryAnimation, child) {
-              return FadeTransition(opacity: animation, child: child);
-            },
-            transitionDuration: const Duration(milliseconds: 600),
-          ),
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
         );
       }
     });

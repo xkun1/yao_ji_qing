@@ -156,13 +156,13 @@ class DatabaseService {
     );
   }
 
-  Future<void> saveMedicationManual({
+  Future<Medicine> saveMedicationManual({
     required String name,
     String? dosage,
     String? note,
     required List<ReminderTime> times,
   }) async {
-    await _saveMedicineWithReminderTimes(
+    return await _saveMedicineWithReminderTimes(
       name: name,
       dosage: dosage,
       frequency: times.length.toString(),
@@ -275,7 +275,7 @@ class DatabaseService {
     // 逻辑会自动在 HomeScreen 的 _loadTodayTasks 中触发，此处确保数据一致性即可
   }
 
-  Future<void> _saveMedicineWithReminderTimes({
+  Future<Medicine> _saveMedicineWithReminderTimes({
     required String name,
     String? dosage,
     required String frequency,
@@ -315,6 +315,7 @@ class DatabaseService {
         minute: reminder.minute,
       );
     }
+    return medicine;
   }
 
   List<ReminderTime> _resolveReminderTimes(MedicationInfo info) {

@@ -14,6 +14,7 @@ import '../widgets/manual_medication_sheet.dart';
 import '../widgets/firework_painter.dart';
 import '../widgets/medication_task_card.dart';
 import '../widgets/feature_guide_overlay.dart';
+import '../widgets/animations.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -720,26 +721,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         child: Padding(
           padding: const EdgeInsets.only(top: 60),
           child: Center(
-            child: Column(
-              children: [
-                Icon(
-                    isAllDone
-                        ? Icons.check_circle_outline_rounded
-                        : Icons.medication_liquid_rounded,
-                    size: 64,
-                    color: isAllDone
-                        ? const Color(0xFF10B981)
-                        : const Color(0xFFE5E7EB)),
-                const SizedBox(height: 16),
-                Text(isAllDone ? "您好，今天的药都吃完啦！🌟" : "今天暂时没有用药任务哦",
-                    style: TextStyle(
-                        color: isAllDone
-                            ? const Color(0xFF059669)
-                            : const Color(0xFF9CA3AF),
-                        fontSize: 16,
-                        fontWeight:
-                            isAllDone ? FontWeight.bold : FontWeight.normal)),
-              ],
+            child: FloatingEmptyIcon(
+              message: isAllDone ? "您好，今天的药都吃完啦！🌟" : "今天暂时没有用药任务哦",
+              subMessage: isAllDone ? "规律服药的你最棒" : "拍照添加药品后自动生成提醒",
+              isAllDone: isAllDone,
             ),
           ),
         ),

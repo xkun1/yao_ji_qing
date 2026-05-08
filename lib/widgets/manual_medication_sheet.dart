@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/medicine.dart';
 import '../services/database_service.dart';
+import '../services/inventory_service.dart';
 
 class ManualMedicationSheet extends StatefulWidget {
   final Medicine? medicine; // 如果有，则是编辑模式
@@ -16,6 +17,9 @@ class _ManualMedicationSheetState extends State<ManualMedicationSheet> {
   final _nameController = TextEditingController();
   final _dosageController = TextEditingController();
   final _noteController = TextEditingController();
+  final _totalQtyController = TextEditingController(text: '30');
+  final _remainQtyController = TextEditingController(text: '30');
+  DateTime? _expiryDate;
   final List<ReminderTime> _times = [];
   bool _isSaving = false;
 
@@ -35,6 +39,16 @@ class _ManualMedicationSheetState extends State<ManualMedicationSheet> {
           }
         });
       });
+      // 加载库存信息
+      InventoryService().get(widget.medicine!.id).then((inv) {
+        if (inv != null && mounted) {
+          setState(() {
+            _totalQtyController.text = inv.totalQuantity.toString();
+            _remainQtyController.text = inv.remainingCount.toString();
+            _expiryDate = inv.expiryDate;
+          });
+        }
+      });
     } else {
       _times.add(const ReminderTime(8, 30));
     }
@@ -45,6 +59,8 @@ class _ManualMedicationSheetState extends State<ManualMedicationSheet> {
     _nameController.dispose();
     _dosageController.dispose();
     _noteController.dispose();
+    _totalQtyController.dispose();
+    _remainQtyController.dispose();
     super.dispose();
   }
 
@@ -80,6 +96,7 @@ class _ManualMedicationSheetState extends State<ManualMedicationSheet> {
 
     setState(() => _isSaving = true);
     try {
+      int medicineId;
       if (_isEditing) {
         await DatabaseService().updateMedicationManual(
           medicine: widget.medicine!,
@@ -88,13 +105,26 @@ class _ManualMedicationSheetState extends State<ManualMedicationSheet> {
           note: _noteController.text.trim(),
           times: _times,
         );
+        medicineId = widget.medicine!.id;
       } else {
-        await DatabaseService().saveMedicationManual(
+        final medicine = await DatabaseService().saveMedicationManual(
           name: _nameController.text.trim(),
           dosage: _dosageController.text.trim(),
           note: _noteController.text.trim(),
           times: _times,
         );
+        medicineId = medicine.id;
+      }
+      // 保存库存信息
+      final totalQty = int.tryParse(_totalQtyController.text) ?? 0;
+      final remainQty = int.tryParse(_remainQtyController.text) ?? totalQty;
+      if (totalQty > 0 || _expiryDate != null) {
+        await InventoryService().save(MedicineInventory(
+          medicineId: medicineId,
+          totalQuantity: totalQty,
+          remainingCount: remainQty.clamp(0, totalQty),
+          expiryDate: _expiryDate,
+        ));
       }
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
@@ -168,6 +198,81 @@ class _ManualMedicationSheetState extends State<ManualMedicationSheet> {
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16))),
                 maxLines: 2,
+              ),
+              const SizedBox(height: 20),
+              const Text("库存管理（选填）",
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _totalQtyController,
+                      decoration: InputDecoration(
+                        labelText: "总数量",
+                        hintText: "如 30",
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16)),
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _remainQtyController,
+                      decoration: InputDecoration(
+                        labelText: "剩余量",
+                        hintText: "如 28",
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16)),
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              InkWell(
+                onTap: () async {
+                  final date = await showDatePicker(
+                    context: context,
+                    initialDate: _expiryDate ?? DateTime.now(),
+                    firstDate: DateTime.now(),
+                    lastDate:
+                        DateTime.now().add(const Duration(days: 365 * 3)),
+                  );
+                  if (date != null) {
+                    setState(() => _expiryDate = date);
+                  }
+                },
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_today_rounded,
+                          size: 18, color: Color(0xFF6B7280)),
+                      const SizedBox(width: 12),
+                      Text(
+                        _expiryDate != null
+                            ? '有效期至：${_expiryDate!.year}-${_expiryDate!.month.toString().padLeft(2, '0')}-${_expiryDate!.day.toString().padLeft(2, '0')}'
+                            : '设置有效期（选填）',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: _expiryDate != null
+                              ? const Color(0xFF1F2937)
+                              : const Color(0xFF9CA3AF),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
               const SizedBox(height: 24),
               const Text("提醒时间",
