@@ -6,6 +6,8 @@ private func isar_version() -> UnsafePointer<CChar>
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
+  private let audioRecorder = DirectAudioRecorder()
+
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -15,6 +17,23 @@ private func isar_version() -> UnsafePointer<CChar>
 
     if #available(iOS 10.0, *) {
       UNUserNotificationCenter.current().delegate = self
+    }
+
+    // 注册直接音频录制通道（iOS 端实现）
+    if let controller = window?.rootViewController as? FlutterViewController {
+      let audioChannel = FlutterMethodChannel(
+        name: "yao_ji_qing/direct_audio",
+        binaryMessenger: controller.binaryMessenger
+      )
+      audioChannel.setMethodCallHandler { [weak self] call, result in
+        self?.audioRecorder.handle(call, result: result)
+      }
+
+      let audioStreamChannel = FlutterEventChannel(
+        name: "yao_ji_qing/direct_audio_stream",
+        binaryMessenger: controller.binaryMessenger
+      )
+      audioStreamChannel.setStreamHandler(audioRecorder)
     }
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
