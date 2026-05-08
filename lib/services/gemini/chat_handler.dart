@@ -566,7 +566,8 @@ class ChatHandler {
     buffer.writeln('- 不得包含任何解释、说明或多余文本');
     buffer.writeln('- 所有字段必须存在');
     buffer.writeln();
-    buffer.write('{"medicine_name":"...","dosage_per_time":"...","frequency_daily":3,"recommended_times":["08:00","12:00","18:00"],"precautions":"..."}');
+    buffer.write(
+        '{"medicine_name":"...","dosage_per_time":"...","frequency_daily":3,"recommended_times":["08:00","12:00","18:00"],"precautions":"..."}');
 
     return buffer.toString();
   }
@@ -592,7 +593,8 @@ class ChatHandler {
 
       if (hasOcrText) {
         debugPrint('📝 [OCR] 提取 ${ocrText.length} 字');
-        onStream?.call('本地 OCR 已提取 ${ocrText.length} 个字符\n正在交由 AI 大模型进行结构化分析...\n\n---\n【OCR 识别原文】\n$ocrText\n---\n\n');
+        onStream?.call(
+            '本地 OCR 已提取 ${ocrText.length} 个字符\n正在交由 AI 大模型进行结构化分析...\n\n---\n【OCR 识别原文】\n$ocrText\n---\n\n');
       } else {
         debugPrint('⚠️ [OCR] 未提取到文字，回退纯视觉识别');
         onStream?.call('OCR 未提取到文字，正在通过视觉模型直接分析图片...\n');
@@ -722,6 +724,10 @@ class ChatHandler {
         model: model,
         closeModel: true,
       );
+      // 模型已关闭，清空缓存引用避免下次调用复用已关闭实例
+      _cachedInferenceModel = null;
+      _cachedInferenceModelBackend = null;
+      _cachedInferenceModelSupportsImage = false;
     }
   }
 
