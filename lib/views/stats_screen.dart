@@ -21,6 +21,7 @@ class StatsScreen extends StatefulWidget {
 class _StatsScreenState extends State<StatsScreen> {
   final DatabaseService _dbService = DatabaseService();
   bool _isLoading = true;
+  bool _isExporting = false;
 
   // 7 天统计
   double _complianceRate = 0.0;
@@ -154,32 +155,46 @@ class _StatsScreenState extends State<StatsScreen> {
   }
 
   Future<void> _exportCsv(BuildContext context) async {
-    final buffer = StringBuffer();
-    buffer.writeln('日期,药品名称,计划时间,实际时间,状态');
-    for (final log in _recentLogs) {
-      final date = DateFormat('yyyy-MM-dd').format(log.planTime);
-      final planTime = DateFormat('HH:mm').format(log.planTime);
-      final actualTime = log.actualTime != null
-          ? DateFormat('yyyy-MM-dd HH:mm').format(log.actualTime!)
-          : '';
-      final status = log.isTaken ? '已服' : '漏服';
-      buffer.writeln('$date,${log.medicineName},$planTime,$actualTime,$status');
+    if (_isExporting) return;
+
+    setState(() {
+      _isExporting = true;
+    });
+
+    try {
+      final buffer = StringBuffer();
+      buffer.writeln('日期,药品名称,计划时间,实际时间,状态');
+      for (final log in _recentLogs) {
+        final date = DateFormat('yyyy-MM-dd').format(log.planTime);
+        final planTime = DateFormat('HH:mm').format(log.planTime);
+        final actualTime = log.actualTime != null
+            ? DateFormat('yyyy-MM-dd HH:mm').format(log.actualTime!)
+            : '';
+        final status = log.isTaken ? '已服' : '漏服';
+        buffer.writeln('$date,${log.medicineName},$planTime,$actualTime,$status');
+      }
+
+      final tempDir = await getTemporaryDirectory();
+      final file = File(
+          '${tempDir.path}/药记清_服药记录_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv');
+      await file.writeAsString(buffer.toString());
+
+      // iOS 设备上使用 share_plus 需要指定 sharePositionOrigin
+      final box = context.findRenderObject() as RenderBox?;
+      final rect = box != null ? box.localToGlobal(Offset.zero) & box.size : null;
+
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: '药记清 - 服药记录导出',
+        sharePositionOrigin: rect,
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExporting = false;
+        });
+      }
     }
-
-    final tempDir = await getTemporaryDirectory();
-    final file = File(
-        '${tempDir.path}/药记清_服药记录_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv');
-    await file.writeAsString(buffer.toString());
-
-    // iOS 设备上使用 share_plus 需要指定 sharePositionOrigin
-    final box = context.findRenderObject() as RenderBox?;
-    final rect = box != null ? box.localToGlobal(Offset.zero) & box.size : null;
-
-    await Share.shareXFiles(
-      [XFile(file.path)],
-      text: '药记清 - 服药记录导出',
-      sharePositionOrigin: rect,
-    );
   }
 
   @override
@@ -206,13 +221,22 @@ class _StatsScreenState extends State<StatsScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Center(
-                        child: SvgPicture.asset(
-                          'assets/icons/share.svg',
-                          colorFilter: const ColorFilter.mode(
-                              Color(0xFF3B82F6), BlendMode.srcIn),
-                          width: 22,
-                          height: 22,
-                        ),
+                        child: _isExporting
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Color(0xFF3B82F6),
+                                ),
+                              )
+                            : SvgPicture.asset(
+                                'assets/icons/share.svg',
+                                colorFilter: const ColorFilter.mode(
+                                    Color(0xFF3B82F6), BlendMode.srcIn),
+                                width: 22,
+                                height: 22,
+                              ),
                       ),
                     ),
                   );
@@ -555,16 +579,26 @@ class _StatsScreenState extends State<StatsScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    SvgPicture.asset(
-                      'assets/icons/share.svg',
-                      width: 16,
-                      height: 16,
-                      colorFilter: const ColorFilter.mode(
-                          Color(0xFF3B82F6), BlendMode.srcIn),
-                    ),
+                    if (_isExporting)
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFF3B82F6),
+                        ),
+                      )
+                    else
+                      SvgPicture.asset(
+                        'assets/icons/share.svg',
+                        width: 16,
+                        height: 16,
+                        colorFilter: const ColorFilter.mode(
+                            Color(0xFF3B82F6), BlendMode.srcIn),
+                      ),
                     const SizedBox(width: 6),
-                    const Text("导出CSV",
-                        style: TextStyle(
+                    Text(_isExporting ? "导出中..." : "导出CSV",
+                        style: const TextStyle(
                             fontSize: 12,
                             color: Color(0xFF3B82F6),
                             fontWeight: FontWeight.w600)),
