@@ -113,8 +113,7 @@ class _StatsScreenState extends State<StatsScreen> {
       // 统计漏服时段
       for (final log in dayLogs.where((l) => !l.isTaken)) {
         final nearestSlot = _nearestTimeSlot(log.planTime.hour);
-        final key =
-            '${DateFormat('MM-dd').format(day)} $nearestSlot';
+        final key = '${DateFormat('MM-dd').format(day)} $nearestSlot';
         missedSlots[key] = (missedSlots[key] ?? 0) + 1;
       }
 
@@ -154,7 +153,7 @@ class _StatsScreenState extends State<StatsScreen> {
     return nearest;
   }
 
-  Future<void> _exportCsv() async {
+  Future<void> _exportCsv(BuildContext context) async {
     final buffer = StringBuffer();
     buffer.writeln('日期,药品名称,计划时间,实际时间,状态');
     for (final log in _recentLogs) {
@@ -172,9 +171,14 @@ class _StatsScreenState extends State<StatsScreen> {
         '${tempDir.path}/药记清_服药记录_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv');
     await file.writeAsString(buffer.toString());
 
+    // iOS 设备上使用 share_plus 需要指定 sharePositionOrigin
+    final box = context.findRenderObject() as RenderBox?;
+    final rect = box != null ? box.localToGlobal(Offset.zero) & box.size : null;
+
     await Share.shareXFiles(
       [XFile(file.path)],
       text: '药记清 - 服药记录导出',
+      sharePositionOrigin: rect,
     );
   }
 
@@ -190,22 +194,29 @@ class _StatsScreenState extends State<StatsScreen> {
           if (!_isLoading)
             Padding(
               padding: const EdgeInsets.only(right: 12),
-              child: GestureDetector(
-                onTap: _exportCsv,
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF3B82F6).withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: SvgPicture.asset(
-                    'assets/icons/share.svg',
-                    colorFilter: const ColorFilter.mode(Color(0xFF3B82F6), BlendMode.srcIn),
-                    width: 22,
-                    height: 22,
-                  ),
-                ),
+              child: Builder(
+                builder: (context) {
+                  return GestureDetector(
+                    onTap: () => _exportCsv(context),
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF3B82F6).withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: SvgPicture.asset(
+                          'assets/icons/share.svg',
+                          colorFilter: const ColorFilter.mode(
+                              Color(0xFF3B82F6), BlendMode.srcIn),
+                          width: 22,
+                          height: 22,
+                        ),
+                      ),
+                    ),
+                  );
+                }
               ),
             ),
         ],
@@ -272,8 +283,7 @@ class _StatsScreenState extends State<StatsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text("7 天服药遵从率",
-                    style:
-                        TextStyle(color: Color(0xFF6B7280), fontSize: 14)),
+                    style: TextStyle(color: Color(0xFF6B7280), fontSize: 14)),
                 const SizedBox(height: 4),
                 Text("近 7 天共坚持服药 $_totalTaken 次",
                     style: const TextStyle(
@@ -281,8 +291,7 @@ class _StatsScreenState extends State<StatsScreen> {
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF1F2937))),
                 const Text("保持这种节奏，坤哥棒棒哒！✨",
-                    style:
-                        TextStyle(color: Color(0xFF10B981), fontSize: 12)),
+                    style: TextStyle(color: Color(0xFF10B981), fontSize: 12)),
               ],
             ),
           )
@@ -296,7 +305,8 @@ class _StatsScreenState extends State<StatsScreen> {
       return const SizedBox.shrink();
     }
 
-    final maxVal = _dailyStats.fold<int>(0, (m, s) => s.total > m ? s.total : m);
+    final maxVal =
+        _dailyStats.fold<int>(0, (m, s) => s.total > m ? s.total : m);
     final displayMax = maxVal < 1 ? 1 : maxVal;
 
     return Container(
@@ -312,8 +322,7 @@ class _StatsScreenState extends State<StatsScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text("30 天服药趋势",
-                  style:
-                      TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               Row(
                 children: [
                   _legendDot(const Color(0xFF10B981), '已服'),
@@ -335,8 +344,7 @@ class _StatsScreenState extends State<StatsScreen> {
                     stat.total == 0 ? 0.0 : (stat.taken / displayMax * 80);
                 final missedHeight =
                     stat.total == 0 ? 0.0 : (stat.missed / displayMax * 80);
-                final isToday =
-                    index == _dailyStats.length - 1;
+                final isToday = index == _dailyStats.length - 1;
 
                 return Padding(
                   padding: EdgeInsets.only(
@@ -417,8 +425,7 @@ class _StatsScreenState extends State<StatsScreen> {
         ),
         const SizedBox(width: 4),
         Text(label,
-            style:
-                const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
+            style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
       ],
     );
   }
@@ -496,8 +503,7 @@ class _StatsScreenState extends State<StatsScreen> {
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 20),
           ..._timeBucketStats.entries.map((e) {
-            final double percent =
-                _totalTaken == 0 ? 0 : e.value / _totalTaken;
+            final double percent = _totalTaken == 0 ? 0 : e.value / _totalTaken;
             return Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: Column(
@@ -536,32 +542,37 @@ class _StatsScreenState extends State<StatsScreen> {
       children: [
         const Text("近期服用记录",
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        GestureDetector(
-          onTap: _exportCsv,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SvgPicture.asset(
-                  'assets/icons/share.svg',
-                  width: 16,
-                  height: 16,
-                  colorFilter: const ColorFilter.mode(Color(0xFF3B82F6), BlendMode.srcIn),
+        Builder(
+          builder: (context) {
+            return GestureDetector(
+              onTap: () => _exportCsv(context),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(20),
                 ),
-                const SizedBox(width: 6),
-                const Text("导出CSV",
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF3B82F6),
-                        fontWeight: FontWeight.w600)),
-              ],
-            ),
-          ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SvgPicture.asset(
+                      'assets/icons/share.svg',
+                      width: 16,
+                      height: 16,
+                      colorFilter: const ColorFilter.mode(
+                          Color(0xFF3B82F6), BlendMode.srcIn),
+                    ),
+                    const SizedBox(width: 6),
+                    const Text("导出CSV",
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF3B82F6),
+                            fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            );
+          }
         ),
       ],
     );
@@ -570,8 +581,7 @@ class _StatsScreenState extends State<StatsScreen> {
   Widget _buildHistoryList() {
     if (_recentLogs.isEmpty) {
       return const Center(
-          child:
-              Text("暂无服用记录", style: TextStyle(color: Color(0xFF9CA3AF))));
+          child: Text("暂无服用记录", style: TextStyle(color: Color(0xFF9CA3AF))));
     }
     return ListView.builder(
       shrinkWrap: true,
@@ -583,8 +593,7 @@ class _StatsScreenState extends State<StatsScreen> {
         final String timeStr = DateFormat('HH:mm').format(log.planTime);
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
-          padding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
