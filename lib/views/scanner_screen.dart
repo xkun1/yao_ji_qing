@@ -101,7 +101,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
     if (mounted) {
       setState(() {
         _isProcessing = true;
-        _streamingText = "正在进行图文识别 (OCR)...";
+        _streamingText = "正在启动本地 OCR 文字识别...";
         _result = null;
       });
     }
@@ -128,30 +128,45 @@ class _ScannerScreenState extends State<ScannerScreen> {
       });
     }
 
-    final info = await _geminiService.extractMedicationInfo(
-      imageBytes,
-      onStream: (text) {
-        if (mounted) {
-          setState(() => _streamingText = text);
-          // 坤哥，这里实现自动滚动到底部
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (_scrollController.hasClients) {
-              _scrollController.animateTo(
-                _scrollController.position.maxScrollExtent,
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOut,
-              );
-            }
-          });
-        }
-      },
-    );
+    MedicationInfo? info;
+    try {
+      info = await _geminiService.extractMedicationInfo(
+        imageBytes,
+        onStream: (text) {
+          if (mounted) {
+            setState(() => _streamingText = text);
+            // 坤哥，这里实现自动滚动到底部
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (_scrollController.hasClients) {
+                _scrollController.animateTo(
+                  _scrollController.position.maxScrollExtent,
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOut,
+                );
+              }
+            });
+          }
+        },
+      );
+    } catch (e) {
+      debugPrint('识药流程异常: $e');
+      info = null;
+    }
 
     if (mounted) {
       setState(() {
         _isProcessing = false;
         _result = info;
       });
+
+      if (info == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('识别失败，请确认模型已正确安装。\n如持续失败，请前往「模型管理」删除旧模型并重新下载。'),
+            duration: Duration(seconds: 6),
+          ),
+        );
+      }
     }
   }
 

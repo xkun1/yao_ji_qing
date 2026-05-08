@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:background_downloader/background_downloader.dart';
 
 import '../services/gemini_service.dart';
+import '../core/constants.dart';
 import '../core/exceptions.dart';
 
 class ModelManagerScreen extends StatefulWidget {
@@ -19,6 +20,7 @@ class _ModelManagerScreenState extends State<ModelManagerScreen> {
 
   bool _initialLoading = true;
   bool _gemmaReady = false;
+  ModelState _gemmaState = ModelState.none;
   bool _asrReady = false;
   bool _ttsReady = false;
 
@@ -83,6 +85,23 @@ class _ModelManagerScreenState extends State<ModelManagerScreen> {
       if (!mounted) return;
 
       for (final task in tasks) {
+        // 如果对应模型文件已存在，取消残留下载任务
+        final modelPath = await _aiService.findExistingModelPath();
+        if (task.filename == AppConstants.gemmaModelId && modelPath != null) {
+          await FileDownloader().cancelTaskWithId(task.taskId);
+          continue;
+        }
+        final asrReady = await _aiService.checkAsrFilesExist();
+        if (task.filename == AppConstants.asrArchiveId && asrReady) {
+          await FileDownloader().cancelTaskWithId(task.taskId);
+          continue;
+        }
+        final ttsReady = await _aiService.checkTtsFilesExist();
+        if (task.filename == AppConstants.ttsArchiveId && ttsReady) {
+          await FileDownloader().cancelTaskWithId(task.taskId);
+          continue;
+        }
+
         final snapshot = _aiService.downloadSnapshotForFilename(task.filename);
         if (snapshot != null) {
           _applyDownloadSnapshot(snapshot);
@@ -119,6 +138,7 @@ class _ModelManagerScreenState extends State<ModelManagerScreen> {
       if (mounted) {
         setState(() {
           _gemmaReady = gReady;
+          _gemmaState = gState;
           _asrReady = aReady;
           _ttsReady = tReady;
           _gemmaSize = gSize;
@@ -181,6 +201,7 @@ class _ModelManagerScreenState extends State<ModelManagerScreen> {
                   subtitle: "本地大语言模型，负责理解与回复",
                   size: _gemmaSize,
                   isReady: _gemmaReady,
+                  modelState: _gemmaState,
                   isDownloading: _downloadingType == 'gemma',
                   downloadProgress: _downloadProgress,
                   downloadStatus: _downloadStatus,
@@ -240,6 +261,7 @@ class _ModelManagerScreenState extends State<ModelManagerScreen> {
     required String subtitle,
     required String size,
     required bool isReady,
+    ModelState modelState = ModelState.none,
     required bool isDownloading,
     required double downloadProgress,
     required String downloadStatus,
@@ -371,8 +393,28 @@ class _ModelManagerScreenState extends State<ModelManagerScreen> {
                         "删除",
                         style: TextStyle(color: Color(0xFFEF4444)),
                       ),
-                    )
-                  else
+                    ),
+                  if (!isReady && modelState == ModelState.fileDetected)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF3C7),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          "待激活",
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFFD97706),
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (!isReady)
                     FilledButton.icon(
                       onPressed: _isProcessing ? null : onDownload,
                       icon: Icon(
@@ -381,7 +423,13 @@ class _ModelManagerScreenState extends State<ModelManagerScreen> {
                             : Icons.download_rounded,
                         size: 18,
                       ),
-                      label: Text(isDownloading ? "下载中" : "下载安装"),
+                      label: Text(
+                        isDownloading
+                            ? "下载中"
+                            : (modelState == ModelState.fileDetected
+                                ? "激活安装"
+                                : "下载安装"),
+                      ),
                       style: FilledButton.styleFrom(
                         backgroundColor: color,
                         shape: RoundedRectangleBorder(

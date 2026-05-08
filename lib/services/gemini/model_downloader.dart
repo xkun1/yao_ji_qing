@@ -50,6 +50,19 @@ class ModelDownloader {
     });
   }
 
+  /// 取消所有残留的后台下载任务
+  Future<void> cancelResidualTasks() async {
+    try {
+      final tasks = await FileDownloader().allTasks(allGroups: true);
+      for (final task in tasks) {
+        await FileDownloader().cancelTaskWithId(task.taskId);
+      }
+    } catch (_) {
+      // 查询或取消失败不影响正常流程
+    }
+    clearDownloadSnapshot();
+  }
+
   /// 下载模型
   Future<void> downloadModel({
     required String type,
@@ -83,6 +96,11 @@ class ModelDownloader {
         var lastProgress = -1.0;
         var cancelRequested = false;
 
+        final isGemma = filename == AppConstants.gemmaModelId;
+        final stallTimeout = isGemma
+            ? AppConstants.gemmaDownloadTimeout
+            : AppConstants.downloadProgressTimeout;
+
         final result = await FileDownloader().download(
           task,
           onStatus: (status) {
@@ -101,7 +119,7 @@ class ModelDownloader {
           onElapsedTime: (_) {
             if (cancelRequested) return;
             final stalledFor = DateTime.now().difference(lastProgressAt);
-            if (stalledFor < AppConstants.downloadProgressTimeout) return;
+            if (stalledFor < stallTimeout) return;
 
             cancelRequested = true;
             setDownloadStage(

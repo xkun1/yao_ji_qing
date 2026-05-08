@@ -42,11 +42,13 @@ class AppConstants {
   // ==================== 下载相关常量 ====================
 
   /// 下载超时时间
+  /// Gemma 大文件（2.4GB）单 chunk 可能耗时较长，用专属超时
   static const Duration downloadProgressTimeout = Duration(seconds: 90);
+  static const Duration gemmaDownloadTimeout = Duration(seconds: 300);
   static const Duration downloadElapsedInterval = Duration(seconds: 10);
 
   /// 下载配置
-  static const int gemmaDownloadChunks = 16;
+  static const int gemmaDownloadChunks = 8; // 减少并行数，降低系统杀 chunk 概率
   static const int gemmaDownloadRetries = 5;
   static const int defaultDownloadChunks = 8;
   static const int defaultDownloadRetries = 3;
@@ -69,6 +71,11 @@ class AppConstants {
   static const double chatTemperature = 0.7;
   static const int chatTopK = 40;
   static const int chatMaxTokens = 2048;
+
+  /// 识药（OCR 结构化）参数 — 短输出低温度，减少推理负载与发热
+  /// maxTokens 控制上下文窗口大小（含输入 prompt），需容纳 OCR 全文+提示词+输出
+  static const double extractionTemperature = 0.1;
+  static const int extractionMaxTokens = 2048;
 
   /// TTS 参数
   static const double ttsLengthScale = 1.15; // 语速调节

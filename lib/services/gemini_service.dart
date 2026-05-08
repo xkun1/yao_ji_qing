@@ -41,6 +41,7 @@ class GeminiService {
 
   // 下载更新流
   Stream<TaskUpdate> get downloadUpdates => _downloader.downloadUpdates;
+
   ModelDownloadSnapshot get modelDownloadSnapshot =>
       _downloader.downloadSnapshot;
 
@@ -57,6 +58,7 @@ class GeminiService {
   /// 初始化服务
   Future<void> init() async {
     await loadSettings();
+    await _downloader.cancelResidualTasks();
     await _chatHandler.ensureInitialized();
   }
 
@@ -84,6 +86,7 @@ class GeminiService {
   Future<void> downloadModel() async {
     try {
       await _chatHandler.ensureInitialized();
+      await _downloader.cancelResidualTasks();
 
       final existingPath = await _chatHandler.findExistingModelPath();
       if (existingPath != null) {
@@ -300,10 +303,10 @@ class GeminiService {
   /// 获取 Gemma 模型 URL
   List<String> _getGemmaModelUrls() {
     return [
-      '${AppConstants.hfMirrorBaseUrl}/${AppConstants.gemmaModelId}',
       AppConstants.hfMirrorGemmaUrl,
-      '${AppConstants.huggingFaceBaseUrl}/${AppConstants.gemmaModelId}',
+      '${AppConstants.hfMirrorBaseUrl}/${AppConstants.gemmaModelId}',
       AppConstants.huggingFaceGemmaUrl,
+      '${AppConstants.huggingFaceBaseUrl}/${AppConstants.gemmaModelId}',
     ];
   }
 
