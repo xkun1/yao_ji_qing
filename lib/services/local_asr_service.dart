@@ -117,7 +117,9 @@ class LocalAsrService {
       });
       _isRecording = true;
     } catch (e) {
-      await _audioSubscription?.cancel();
+      try {
+        await _audioSubscription?.cancel();
+      } catch (_) {}
       _audioSubscription = null;
       _isRecording = false;
       onError?.call(e);
@@ -136,7 +138,12 @@ class LocalAsrService {
     }
 
     _isRecording = false;
-    await _audioSubscription?.cancel();
+    try {
+      await _audioSubscription?.cancel();
+    } catch (e) {
+      // EventChannel cancel 在原生端 handler 已释放时会抛出 MissingPluginException，安全忽略
+      debugPrint('取消音频流订阅失败（可忽略）: $e');
+    }
     _audioSubscription = null;
     return _flushFinalResult();
   }

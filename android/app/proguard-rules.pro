@@ -19,3 +19,8 @@
 
 # Background Downloader
 -keep class com.bb_can_fly.background_downloader.** { *; }
+
+# Google ML Kit Text Recognition - 忽略可选语言脚本缺失的类
+-dontwarn com.google.mlkit.vision.text.devanagari.**
+-dontwarn com.google.mlkit.vision.text.japanese.**
+-dontwarn com.google.mlkit.vision.text.korean.**

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
 import '../services/gemini_service.dart';
@@ -155,12 +156,21 @@ class _AIChatScreenContentState extends State<_AIChatScreenContent>
     );
   }
 
-  void _showAsrUnavailableMessage() {
+  void _showAsrUnavailableMessage(String reason) {
     if (!mounted) return;
+    final isPermission = reason.contains('权限');
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('语音识别未就绪'),
+      SnackBar(
+        content: Text(reason),
         backgroundColor: Colors.redAccent,
+        duration: const Duration(seconds: 5),
+        action: isPermission
+            ? SnackBarAction(
+                label: '前往设置',
+                textColor: Colors.white,
+                onPressed: () => openAppSettings(),
+              )
+            : null,
       ),
     );
   }
@@ -169,7 +179,7 @@ class _AIChatScreenContentState extends State<_AIChatScreenContent>
     final viewModel = context.read<ChatViewModel>();
     await viewModel.enterLiveMode(
       (modelName) => _showModelMissingDialog(modelName),
-      () => _showAsrUnavailableMessage(),
+      (reason) => _showAsrUnavailableMessage(reason),
       onLiveScroll: _scrollToBottomLive,
     );
   }

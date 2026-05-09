@@ -120,6 +120,9 @@ class ChatViewModel extends ChangeNotifier {
   String? _lastError;
   String? get lastError => _lastError;
 
+  String? _lastAsrError;
+  String? get lastAsrError => _lastAsrError;
+
   void clearLastError() {
     _lastError = null;
     notifyListeners();
@@ -149,15 +152,22 @@ class ChatViewModel extends ChangeNotifier {
       final status = await Permission.microphone.request();
       if (!status.isGranted) {
         _speechEnabled = false;
+        _lastAsrError = '麦克风权限未授予，请在系统设置中开启';
         notifyListeners();
         return;
       }
       final ready = await _localAsrService.initialize();
       _speechEnabled = ready;
+      if (ready) {
+        _lastAsrError = null;
+      } else {
+        _lastAsrError = _localAsrService.lastError ?? '语音识别引擎初始化失败';
+      }
       notifyListeners();
     } catch (e) {
       debugPrint('语音识别初始化异常: $e');
       _speechEnabled = false;
+      _lastAsrError = '语音识别初始化异常: $e';
       notifyListeners();
     }
   }
@@ -235,7 +245,7 @@ class ChatViewModel extends ChangeNotifier {
   Function()? _onLiveScroll;
 
   Future<bool> enterLiveMode(
-      Function(String) onModelMissing, Function() onAsrUnavailable,
+      Function(String) onModelMissing, Function(String) onAsrUnavailable,
       {Function()? onLiveScroll}) async {
     _onLiveScroll = onLiveScroll;
     if (_modelState != ModelState.ready) {
@@ -264,7 +274,7 @@ class ChatViewModel extends ChangeNotifier {
     if (!_speechEnabled) {
       await initSpeech();
       if (!_speechEnabled) {
-        onAsrUnavailable();
+        onAsrUnavailable(_lastAsrError ?? '语音识别未就绪');
         return false;
       }
     }
