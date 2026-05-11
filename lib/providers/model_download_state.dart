@@ -125,9 +125,7 @@ class ModelDownloadState extends ChangeNotifier {
       _asrReady = await _geminiService.checkAsrFilesExist();
       _ttsReady = await _geminiService.checkTtsFilesExist();
 
-      _gemmaSize = gModelPath != null
-          ? await _getFileSize(gModelPath)
-          : '未下载';
+      _gemmaSize = gModelPath != null ? await _getFileSize(gModelPath) : '未下载';
 
       if (_asrReady) {
         final asrPath = await _geminiService.getAsrModelPathForDeletion();
@@ -169,8 +167,7 @@ class ModelDownloadState extends ChangeNotifier {
     if (await dir.exists()) {
       int totalSize = 0;
       try {
-        await for (var file
-            in dir.list(recursive: true, followLinks: false)) {
+        await for (var file in dir.list(recursive: true, followLinks: false)) {
           if (file is File) {
             totalSize += await file.length();
           }

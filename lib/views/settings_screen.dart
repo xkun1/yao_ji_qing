@@ -50,8 +50,7 @@ class SettingsScreen extends StatelessWidget {
                 value: settingsState.autoSpeak,
                 onChanged: (bool value) async {
                   if (value) {
-                    final ttsExist =
-                        await GeminiService().checkTtsFilesExist();
+                    final ttsExist = await GeminiService().checkTtsFilesExist();
                     if (!ttsExist) {
                       if (context.mounted) {
                         _showTtsMissingDialog(context);

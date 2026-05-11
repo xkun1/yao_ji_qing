@@ -88,9 +88,7 @@ class _MedicationTaskCardState extends State<MedicationTaskCard> {
       child: Center(
         child: Icon(
           t.isTaken ? Icons.check_rounded : Icons.access_time_rounded,
-          color: t.isTaken
-              ? const Color(0xFF10B981)
-              : const Color(0xFF3B82F6),
+          color: t.isTaken ? const Color(0xFF10B981) : const Color(0xFF3B82F6),
           size: 26,
         ),
       ),

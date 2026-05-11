@@ -19,10 +19,8 @@ void main() {
       ];
 
       for (final route in routes) {
-        final generated =
-            AppRoutes.generateRoute(RouteSettings(name: route));
-        expect(generated, isNotNull,
-            reason: '路由 $route 生成失败');
+        final generated = AppRoutes.generateRoute(RouteSettings(name: route));
+        expect(generated, isNotNull, reason: '路由 $route 生成失败');
       }
     });
 

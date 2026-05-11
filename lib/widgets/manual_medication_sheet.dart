@@ -201,8 +201,7 @@ class _ManualMedicationSheetState extends State<ManualMedicationSheet> {
               ),
               const SizedBox(height: 20),
               const Text("库存管理（选填）",
-                  style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold)),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -240,8 +239,7 @@ class _ManualMedicationSheetState extends State<ManualMedicationSheet> {
                     context: context,
                     initialDate: _expiryDate ?? DateTime.now(),
                     firstDate: DateTime.now(),
-                    lastDate:
-                        DateTime.now().add(const Duration(days: 365 * 3)),
+                    lastDate: DateTime.now().add(const Duration(days: 365 * 3)),
                   );
                   if (date != null) {
                     setState(() => _expiryDate = date);

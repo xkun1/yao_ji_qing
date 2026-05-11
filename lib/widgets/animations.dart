@@ -253,7 +253,9 @@ class _FloatingEmptyIconState extends State<FloatingEmptyIcon>
         Text(
           widget.message,
           style: TextStyle(
-            color: widget.isAllDone ? const Color(0xFF059669) : const Color(0xFF9CA3AF),
+            color: widget.isAllDone
+                ? const Color(0xFF059669)
+                : const Color(0xFF9CA3AF),
             fontSize: 16,
             fontWeight: widget.isAllDone ? FontWeight.bold : FontWeight.normal,
           ),
@@ -281,7 +283,8 @@ class _FloatingIconPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final Offset center = Offset(size.width / 2, size.height / 2);
     final double radius = size.width / 2 * 0.8;
-    final Color baseColor = isAllDone ? const Color(0xFF10B981) : const Color(0xFFE5E7EB);
+    final Color baseColor =
+        isAllDone ? const Color(0xFF10B981) : const Color(0xFFE5E7EB);
 
     // 柔和阴影
     final shadowPaint = Paint()
@@ -330,7 +333,8 @@ class _FloatingIconPainter extends CustomPainter {
     canvas.drawPath(path, paint);
   }
 
-  void _drawMedicineIcon(Canvas canvas, Offset center, double size, Paint paint) {
+  void _drawMedicineIcon(
+      Canvas canvas, Offset center, double size, Paint paint) {
     final fillPaint = Paint()
       ..style = PaintingStyle.fill
       ..color = paint.color.withValues(alpha: 0.15);

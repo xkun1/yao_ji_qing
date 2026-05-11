@@ -174,9 +174,9 @@ class GeminiService {
       _downloader.clearDownloadSnapshot();
     } catch (e) {
       if (e is ModelException && e.code == 'MODEL_INCOMPATIBLE') {
-         // iOS 无法重启，静默忽略以避免向上传递导致外部误判为下载失败
-         _downloader.clearDownloadSnapshot();
-         return;
+        // iOS 无法重启，静默忽略以避免向上传递导致外部误判为下载失败
+        _downloader.clearDownloadSnapshot();
+        return;
       }
       _downloader.clearDownloadSnapshot();
       rethrow;
@@ -220,9 +220,9 @@ class GeminiService {
       _downloader.clearDownloadSnapshot();
     } catch (e) {
       if (e is ModelException && e.code == 'MODEL_INCOMPATIBLE') {
-         // iOS 无法重启，静默忽略以避免向上传递导致外部误判为下载失败
-         _downloader.clearDownloadSnapshot();
-         return;
+        // iOS 无法重启，静默忽略以避免向上传递导致外部误判为下载失败
+        _downloader.clearDownloadSnapshot();
+        return;
       }
       _downloader.clearDownloadSnapshot();
       rethrow;

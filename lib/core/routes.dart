@@ -28,8 +28,10 @@ class AppRoutes {
   static Route<dynamic> generateRoute(RouteSettings settings) {
     final name = settings.name;
     if (name == home) return _page(const HomeScreen(), settings);
-    if (name == AppRoutes.settings) return _page(const SettingsScreen(), settings);
-    if (name == modelManager) return _page(const ModelManagerScreen(), settings);
+    if (name == AppRoutes.settings)
+      return _page(const SettingsScreen(), settings);
+    if (name == modelManager)
+      return _page(const ModelManagerScreen(), settings);
     if (name == aiChat) return _page(const AIChatScreen(), settings);
     if (name == scanner) {
       final args = settings.arguments;
@@ -41,7 +43,8 @@ class AppRoutes {
     if (name == stats) return _page(const StatsScreen(), settings);
     if (name == about) return _page(const AboutScreen(), settings);
     if (name == license) return _page(const LicenseScreen(), settings);
-    if (name == privacyPolicy) return _page(const PrivacyPolicyScreen(), settings);
+    if (name == privacyPolicy)
+      return _page(const PrivacyPolicyScreen(), settings);
     if (name == setupGuide) return _page(const SetupGuideScreen(), settings);
     return _page(const HomeScreen(), settings);
   }

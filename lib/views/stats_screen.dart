@@ -171,7 +171,8 @@ class _StatsScreenState extends State<StatsScreen> {
             ? DateFormat('yyyy-MM-dd HH:mm').format(log.actualTime!)
             : '';
         final status = log.isTaken ? '已服' : '漏服';
-        buffer.writeln('$date,${log.medicineName},$planTime,$actualTime,$status');
+        buffer
+            .writeln('$date,${log.medicineName},$planTime,$actualTime,$status');
       }
 
       final tempDir = await getTemporaryDirectory();
@@ -181,7 +182,8 @@ class _StatsScreenState extends State<StatsScreen> {
 
       // iOS 设备上使用 share_plus 需要指定 sharePositionOrigin
       final box = context.findRenderObject() as RenderBox?;
-      final rect = box != null ? box.localToGlobal(Offset.zero) & box.size : null;
+      final rect =
+          box != null ? box.localToGlobal(Offset.zero) & box.size : null;
 
       await Share.shareXFiles(
         [XFile(file.path)],
@@ -209,39 +211,37 @@ class _StatsScreenState extends State<StatsScreen> {
           if (!_isLoading)
             Padding(
               padding: const EdgeInsets.only(right: 12),
-              child: Builder(
-                builder: (context) {
-                  return GestureDetector(
-                    onTap: () => _exportCsv(context),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF3B82F6).withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Center(
-                        child: _isExporting
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Color(0xFF3B82F6),
-                                ),
-                              )
-                            : SvgPicture.asset(
-                                'assets/icons/share.svg',
-                                colorFilter: const ColorFilter.mode(
-                                    Color(0xFF3B82F6), BlendMode.srcIn),
-                                width: 22,
-                                height: 22,
-                              ),
-                      ),
+              child: Builder(builder: (context) {
+                return GestureDetector(
+                  onTap: () => _exportCsv(context),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF3B82F6).withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                  );
-                }
-              ),
+                    child: Center(
+                      child: _isExporting
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Color(0xFF3B82F6),
+                              ),
+                            )
+                          : SvgPicture.asset(
+                              'assets/icons/share.svg',
+                              colorFilter: const ColorFilter.mode(
+                                  Color(0xFF3B82F6), BlendMode.srcIn),
+                              width: 22,
+                              height: 22,
+                            ),
+                    ),
+                  ),
+                );
+              }),
             ),
         ],
       ),
@@ -566,48 +566,46 @@ class _StatsScreenState extends State<StatsScreen> {
       children: [
         const Text("近期服用记录",
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        Builder(
-          builder: (context) {
-            return GestureDetector(
-              onTap: () => _exportCsv(context),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_isExporting)
-                      const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Color(0xFF3B82F6),
-                        ),
-                      )
-                    else
-                      SvgPicture.asset(
-                        'assets/icons/share.svg',
-                        width: 16,
-                        height: 16,
-                        colorFilter: const ColorFilter.mode(
-                            Color(0xFF3B82F6), BlendMode.srcIn),
-                      ),
-                    const SizedBox(width: 6),
-                    Text(_isExporting ? "导出中..." : "导出CSV",
-                        style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF3B82F6),
-                            fontWeight: FontWeight.w600)),
-                  ],
-                ),
+        Builder(builder: (context) {
+          return GestureDetector(
+            onTap: () => _exportCsv(context),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(20),
               ),
-            );
-          }
-        ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_isExporting)
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Color(0xFF3B82F6),
+                      ),
+                    )
+                  else
+                    SvgPicture.asset(
+                      'assets/icons/share.svg',
+                      width: 16,
+                      height: 16,
+                      colorFilter: const ColorFilter.mode(
+                          Color(0xFF3B82F6), BlendMode.srcIn),
+                    ),
+                  const SizedBox(width: 6),
+                  Text(_isExporting ? "导出中..." : "导出CSV",
+                      style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF3B82F6),
+                          fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+          );
+        }),
       ],
     );
   }
