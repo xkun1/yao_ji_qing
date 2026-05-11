@@ -180,6 +180,8 @@ class _StatsScreenState extends State<StatsScreen> {
           '${tempDir.path}/药记清_服药记录_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv');
       await file.writeAsString(buffer.toString());
 
+      if (!context.mounted) return;
+
       // iOS 设备上使用 share_plus 需要指定 sharePositionOrigin
       final box = context.findRenderObject() as RenderBox?;
       final rect =

@@ -345,6 +345,8 @@ class _ModelManagerScreenState extends State<ModelManagerScreen> {
   }
 
   void _handleDelete(String type) async {
+    final modelDownloadState = context.modelDownloadState;
+    final messenger = ScaffoldMessenger.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -366,9 +368,9 @@ class _ModelManagerScreenState extends State<ModelManagerScreen> {
     );
 
     if (confirmed == true) {
-      await context.modelDownloadState.deleteModel(type);
+      await modelDownloadState.deleteModel(type);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(content: Text("模型已彻底清理")),
       );
     }
