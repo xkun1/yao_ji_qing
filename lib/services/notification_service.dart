@@ -150,9 +150,10 @@ class NotificationService {
       for (int i = 1; i <= 9; i++) {
         await _notificationsPlugin.cancel(id + i * 20000);
       }
-    } else {
-      await _notificationsPlugin.cancel(id);
     }
+
+    // Android 提醒由原生闹钟/震动链路负责，避免 release 混淆后
+    // flutter_local_notifications 读取旧排期缓存时抛 Missing type parameter。
     await _stopActiveVibration();
     await _cancelNativeVibration(id);
   }

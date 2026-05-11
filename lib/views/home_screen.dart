@@ -53,6 +53,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late String _currentQuote;
   List<TodayMedicationTask> _tasks = [];
   TodayMedicationTask? _guideTask;
+  final Set<String> _markingTaskKeys = {};
+  final Set<String> _optimisticTakenTaskKeys = {};
   bool _isGuiding = false;
   late final List<FireworkParticle> _fireworkParticles;
   bool _isLoading = true;
@@ -217,9 +219,27 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
     );
 
-    if (confirmed != true) return;
-    await _dbService.deleteMedication(task.medicine);
-    await _loadTodayTasks();
+    if (confirmed != true || !mounted) return;
+
+    // 乐观更新：立即从 UI 中移除该药品的所有任务，避免 release 模式下
+    // DB 查询返回旧缓存导致已删除药品仍然可见的问题
+    final deleteId = task.medicine.id;
+    setState(() {
+      _tasks.removeWhere((t) => t.medicine.id == deleteId);
+      if (_guideTask?.medicine.id == deleteId) {
+        _guideTask = null;
+      }
+    });
+
+    try {
+      await _dbService.deleteMedication(task.medicine);
+    } catch (e) {
+      debugPrint('删除药品失败: $e');
+    }
+
+    // 短暂延迟确保 Isar 写事务在 AOT 模式下已完全刷盘
+    await Future.delayed(const Duration(milliseconds: 50));
+    if (mounted) await _loadTodayTasks();
   }
 
   Future<void> _initData() async {
@@ -229,21 +249,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Future<void> _loadTodayTasks() async {
     final tasks = await _dbService.getTodayMedicationTasks();
+    final mergedTasks = tasks
+        .map((task) => _optimisticTakenTaskKeys.contains(task.occurrenceKey)
+            ? task.copyWith(isTaken: true)
+            : task)
+        .toList();
     if (!mounted) return;
     setState(() {
-      _tasks = tasks;
+      _tasks = mergedTasks;
       if (_isGuiding && _guideTask != null) {
-        _tasks = [_guideTask!, ...tasks];
+        _tasks = [_guideTask!, ...mergedTasks];
       }
       _isLoading = false;
     });
 
-    final hasPending = tasks.any((t) => !t.isTaken);
+    final hasPending = mergedTasks.any((t) => !t.isTaken);
     if (tasks.isEmpty || !hasPending) {
       await _notifService.stopForegroundService();
     } else {
       await _notifService.startForegroundService();
-      final nextTask = tasks.firstWhere((t) => !t.isTaken);
+      final nextTask = mergedTasks.firstWhere((t) => !t.isTaken);
       await _notifService.updateForegroundService(
         title: "下一顿用药提醒",
         body:
@@ -706,11 +731,39 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _handleMarkTaken(TodayMedicationTask task) async {
-    if (_isGuiding) return;
+    if (_isGuiding || task.isTaken) return;
+
+    final taskKey = task.occurrenceKey;
+    if (_markingTaskKeys.contains(taskKey)) return;
+
     final pendingCount = _tasks.where((t) => !t.isTaken).length;
-    await _dbService.markTaskTaken(task);
-    await _loadTodayTasks();
-    if (pendingCount == 1) _showCompletionCelebration();
+    _markingTaskKeys.add(taskKey);
+    _optimisticTakenTaskKeys.add(taskKey);
+
+    // Release AOT 下偶发 Isar 查询回读旧缓存，先本地置为已服用，保证首页即时刷新。
+    if (mounted) {
+      setState(() {
+        _tasks = _tasks
+            .map((t) =>
+                t.occurrenceKey == taskKey ? t.copyWith(isTaken: true) : t)
+            .toList();
+      });
+    }
+
+    try {
+      await _dbService.markTaskTaken(task);
+      if (pendingCount == 1) _showCompletionCelebration();
+
+      // 给原生持久化一点提交窗口，再用服务端状态校正；乐观标记会兜底防止旧缓存覆盖 UI。
+      await Future.delayed(const Duration(milliseconds: 50));
+      if (mounted) await _loadTodayTasks();
+    } catch (e) {
+      debugPrint('标记服药失败: $e');
+      _optimisticTakenTaskKeys.remove(taskKey);
+      if (mounted) await _loadTodayTasks();
+    } finally {
+      _markingTaskKeys.remove(taskKey);
+    }
   }
 
   Widget _buildMedList() {

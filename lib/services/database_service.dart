@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/medicine.dart';
@@ -19,6 +20,19 @@ class TodayMedicationTask {
 
   String get timeLabel =>
       '${planTime.hour.toString().padLeft(2, '0')}:${planTime.minute.toString().padLeft(2, '0')}';
+
+  /// 单次今日任务的稳定标识，用于 UI 乐观刷新和防重复点击。
+  String get occurrenceKey =>
+      '${medicine.id}_${reminder.id}_${planTime.millisecondsSinceEpoch}';
+
+  TodayMedicationTask copyWith({bool? isTaken}) {
+    return TodayMedicationTask(
+      medicine: medicine,
+      reminder: reminder,
+      planTime: planTime,
+      isTaken: isTaken ?? this.isTaken,
+    );
+  }
 }
 
 class ReminderTime {
@@ -271,7 +285,21 @@ class DatabaseService {
       await isar.medicines.delete(id);
     });
 
-    // 4. 停止前台服务（如果这是最后一项任务）
+    // 4. 验证：确保药品真的被删除了（防御 release AOT 下 Isar 缓存问题）
+    final verify = await isar.medicines.get(id);
+    if (verify != null) {
+      debugPrint('⚠️ Isar 删除验证失败，重试删除药品 id=$id');
+      await isar.writeTxn(() async {
+        await isar.intakeLogs
+            .filter()
+            .medicine((q) => q.idEqualTo(id))
+            .deleteAll();
+        await isar.reminders.deleteAll(reminderIds);
+        await isar.medicines.delete(id);
+      });
+    }
+
+    // 5. 停止前台服务（如果这是最后一项任务）
     // 逻辑会自动在 HomeScreen 的 _loadTodayTasks 中触发，此处确保数据一致性即可
   }
 

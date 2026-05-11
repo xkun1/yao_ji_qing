@@ -35,5 +35,31 @@ void main() {
       expect(time.hour, 8);
       expect(time.minute, 0);
     });
+
+    test('TodayMedicationTask occurrenceKey 稳定且 copyWith 仅更新服药状态', () {
+      final medicine = Medicine()
+        ..id = 101
+        ..name = 'Test Pill';
+      final reminder = Reminder()
+        ..id = 202
+        ..hour = 9
+        ..minute = 5;
+      final planTime = DateTime(2026, 4, 30, 9, 5);
+      final task = TodayMedicationTask(
+        medicine: medicine,
+        reminder: reminder,
+        planTime: planTime,
+        isTaken: false,
+      );
+
+      final updated = task.copyWith(isTaken: true);
+
+      expect(task.occurrenceKey, '101_202_${planTime.millisecondsSinceEpoch}');
+      expect(updated.occurrenceKey, task.occurrenceKey);
+      expect(updated.isTaken, isTrue);
+      expect(task.isTaken, isFalse);
+      expect(identical(updated.medicine, medicine), isTrue);
+      expect(identical(updated.reminder, reminder), isTrue);
+    });
   });
 }
