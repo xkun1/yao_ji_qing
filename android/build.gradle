@@ -1,7 +1,9 @@
 allprojects {
     repositories {
-        google()
         mavenCentral()
+        maven { url 'https://maven.aliyun.com/repository/public' }
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        google()
     }
 }
 
@@ -11,6 +13,21 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(':app')
+    tasks.withType(JavaCompile).configureEach {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+        kotlinOptions {
+            jvmTarget = "17"
+            freeCompilerArgs += ["-Xsuppress-version-warnings"]
+            try {
+                if (languageVersion != null && (languageVersion == "1.6" || languageVersion == "1.7" || languageVersion == "1.8")) {
+                    languageVersion = "1.9"
+                }
+            } catch (Exception e) {}
+        }
+    }
 }
 
 // 解决 androidx.core 版本不一致导致的 lStar 错误
@@ -29,6 +46,10 @@ def configureAndroidLibrary = { subproject ->
         def androidExtension = subproject.extensions.findByName("android")
         if (androidExtension != null) {
             androidExtension.compileSdkVersion 36
+            androidExtension.compileOptions {
+                sourceCompatibility JavaVersion.VERSION_17
+                targetCompatibility JavaVersion.VERSION_17
+            }
             if (!androidExtension.namespace) {
                 def fallbackNamespace = subproject.group?.toString()
                 if (!fallbackNamespace || fallbackNamespace == "unspecified") {

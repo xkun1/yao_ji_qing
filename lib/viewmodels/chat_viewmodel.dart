@@ -24,6 +24,7 @@ class AIChatMessage {
 class ChatViewModel extends ChangeNotifier {
   final GeminiService _aiService;
   final LocalAsrService _localAsrService;
+  final ImagePicker _picker = ImagePicker();
 
   static const Duration _modelIdleReleaseDelay = Duration(minutes: 3);
 
@@ -133,10 +134,10 @@ class ChatViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> handleLostData(ImagePicker picker) async {
+  Future<void> handleLostData() async {
     if (!Platform.isAndroid) return;
     try {
-      final LostDataResponse response = await picker.retrieveLostData();
+      final LostDataResponse response = await _picker.retrieveLostData();
       if (response.isEmpty || response.file == null) return;
       final bytes = await response.file!.readAsBytes();
       _selectedImageBytes = bytes;
@@ -145,6 +146,14 @@ class ChatViewModel extends ChangeNotifier {
     } catch (e) {
       debugPrint('恢复丢失的图片数据失败: $e');
     }
+  }
+
+  void initEngineIfNeeded() {
+    initSpeech();
+    if (_aiService.autoSpeak) {
+      _aiService.initTts();
+    }
+    listenToVolume();
   }
 
   Future<void> initSpeech() async {
@@ -243,11 +252,14 @@ class ChatViewModel extends ChangeNotifier {
   }
 
   Function()? _onLiveScroll;
+  void setOnLiveScroll(Function()? callback) {
+    _onLiveScroll = callback;
+  }
 
   Future<bool> enterLiveMode(
       Function(String) onModelMissing, Function(String) onAsrUnavailable,
       {Function()? onLiveScroll}) async {
-    _onLiveScroll = onLiveScroll;
+    if (onLiveScroll != null) _onLiveScroll = onLiveScroll;
     if (_modelState != ModelState.ready) {
       onModelMissing('对话引擎');
       return false;
@@ -579,10 +591,10 @@ class ChatViewModel extends ChangeNotifier {
     return optimized;
   }
 
-  Future<void> pickImage(ImageSource source, ImagePicker picker) async {
+  Future<void> pickImage(ImageSource source) async {
     try {
       scheduleModelRelease();
-      final XFile? image = await picker.pickImage(
+      final XFile? image = await _picker.pickImage(
           source: source, maxWidth: 768, maxHeight: 768, imageQuality: 70);
       if (image != null) {
         await Future.delayed(const Duration(milliseconds: 200));

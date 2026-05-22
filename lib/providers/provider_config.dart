@@ -4,6 +4,11 @@ import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../providers/model_download_state.dart';
 import '../providers/settings_state.dart';
+import '../services/gemini_service.dart';
+import '../services/local_asr_service.dart';
+import '../viewmodels/chat_viewmodel.dart';
+import '../viewmodels/home_viewmodel.dart';
+import '../viewmodels/stats_viewmodel.dart';
 
 /// Provider 配置
 class ProviderConfig {
@@ -18,6 +23,15 @@ class ProviderConfig {
       ),
       ChangeNotifierProvider<SettingsState>(
         create: (_) => SettingsState()..init(),
+      ),
+      ChangeNotifierProvider<HomeViewModel>(
+        create: (_) => HomeViewModel(),
+      ),
+      ChangeNotifierProvider<StatsViewModel>(
+        create: (_) => StatsViewModel(),
+      ),
+      ChangeNotifierProvider<ChatViewModel>(
+        create: (_) => ChatViewModel(GeminiService(), LocalAsrService()),
       ),
     ];
   }

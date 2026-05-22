@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
+import 'providers/provider_config.dart';
 
 import 'core/routes.dart';
-import 'providers/app_state.dart';
-import 'providers/model_download_state.dart';
-import 'providers/settings_state.dart';
 import 'services/database_service.dart';
 import 'services/gemini_service.dart';
 import 'services/notification_service.dart';
 import 'views/splash_screen.dart';
+
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,7 +33,13 @@ void main() async {
   final geminiService = GeminiService();
   await geminiService.init();
 
-  runApp(const YaoJiQingApp());
+  await SentryFlutter.init(
+    (options) {
+      options.dsn = const String.fromEnvironment('SENTRY_DSN', defaultValue: '');
+      options.tracesSampleRate = 1.0;
+    },
+    appRunner: () => runApp(const YaoJiQingApp()),
+  );
 }
 
 class YaoJiQingApp extends StatelessWidget {
@@ -40,18 +48,17 @@ class YaoJiQingApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
-      providers: [
-        ChangeNotifierProvider<SettingsState>(
-          create: (_) => SettingsState()..init(),
-        ),
-        ChangeNotifierProvider<AppState>(create: (_) => AppState()),
-        ChangeNotifierProvider<ModelDownloadState>(
-          create: (_) => ModelDownloadState()..init(),
-        ),
-      ],
+      providers: ProviderConfig.createProviders(),
       child: MaterialApp(
         title: '药记清',
         debugShowCheckedModeBanner: false,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: AppLocalizations.supportedLocales,
         theme: ThemeData(
           useMaterial3: true,
           colorScheme: ColorScheme.fromSeed(
